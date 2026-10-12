@@ -1,0 +1,16 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# Secretos: nunca al repositorio
+.env
+*.env
+!.env.example
+secrets.toml
+
+# Frontend
+node_modules/
+dist/

@@ -1,0 +1,49 @@
+# Entorno completo en una PC (desarrollo o un servidor propio):
+#   docker compose up --build
+# Luego, crear el primer usuario:
+#   docker compose exec api python -m scripts.usuarios crear TU_USUARIO --rol admin
+# La app queda en http://localhost:8000
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: monitor
+      POSTGRES_PASSWORD: monitor
+      POSTGRES_DB: monitor
+    volumes:
+      - datos_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U monitor"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://monitor:monitor@db:5432/monitor
+      JWT_SECRET: ${JWT_SECRET:-cambia-esto-por-un-secreto-de-32-caracteres-o-mas}
+      COOKIE_SEGURA: "false" # true cuando se sirve por HTTPS
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # El robot solo funciona dentro de la red de MAXCOM (donde se alcanza Cepheus).
+  # Se activa con: docker compose --profile robot up
+  robot:
+    build: .
+    command: ["python", "-m", "worker.sync"]
+    profiles: ["robot"]
+    restart: unless-stopped
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://monitor:monitor@db:5432/monitor
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  datos_pg:
