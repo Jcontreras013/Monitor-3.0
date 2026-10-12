@@ -115,6 +115,11 @@ def test_filtros():
     assert [o.num for o in criticas] == ["2", "3"]
     no_asig = m.calcular_resumen(ordenes, m.Filtros(no_asignadas=True), AHORA)
     assert no_asig["mostrando"] == 1 and no_asig["kpis"]["tecnicos_en_ruta"] == 0
+    # Los conteos de los botones rápidos no dependen del botón activo...
+    assert no_asig["rapidos"] == {"todas": 5, "criticas": 2, "no_asignadas": 1}
+    # ...pero sí de los demás filtros.
+    solo_ins = m.calcular_resumen(ordenes, m.Filtros(actividades=["INSFIBRA"], solo_criticas=True), AHORA)
+    assert solo_ins["rapidos"] == {"todas": 1, "criticas": 0, "no_asignadas": 0}
     por_tecnico = m.aplicar_filtros(ordenes, m.Filtros(tecnico="Ana", actividades=["SOPFIBRA"]), AHORA)
     assert [o.num for o in por_tecnico] == ["1", "2", "3"]
 

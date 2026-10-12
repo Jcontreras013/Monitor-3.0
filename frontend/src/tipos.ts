@@ -31,6 +31,7 @@ export type ResumenMonitor = {
     offline: number
     total_pendientes: number
   }
+  rapidos: Record<Rapido, number>
   retraso: { cubeta: string; cantidad: number; porcentaje: number }[]
   tablero: { sop: GrupoTablero; instalaciones: GrupoTablero; plex: GrupoTablero }
   consolidado: Consolidado[]
@@ -84,20 +85,21 @@ export type EstadoRobot = {
   atrasado: boolean
 }
 
+// Filtro rápido (exclusivo): todas las pendientes, solo críticas o solo sin técnico.
+export type Rapido = 'todas' | 'criticas' | 'no_asignadas'
+
 export type Filtros = {
+  rapido: Rapido
+  tecnico: string
   actividad: string[]
   estado: string[]
   motivo: string[]
-  tecnico: string
-  solo_criticas: boolean
-  no_asignadas: boolean
 }
 
 export const FILTROS_VACIOS: Filtros = {
+  rapido: 'todas',
+  tecnico: '',
   actividad: [],
   estado: [],
   motivo: [],
-  tecnico: '',
-  solo_criticas: false,
-  no_asignadas: false,
 }

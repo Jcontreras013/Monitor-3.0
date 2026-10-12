@@ -24,6 +24,15 @@ function Marcas({ o }: { o: Orden }) {
   )
 }
 
+function Cliente({ o, detalle }: { o: Orden; detalle: (string | null)[] }) {
+  return (
+    <>
+      <span className="block max-w-56 truncate">{o.nombre ?? '—'}</span>
+      <span className="block text-xs text-slate-400">{detalle.filter(Boolean).join(' · ')}</span>
+    </>
+  )
+}
+
 const COLUMNAS_PENDIENTES: Columna[] = [
   {
     clave: 'dias',
@@ -33,22 +42,30 @@ const COLUMNAS_PENDIENTES: Columna[] = [
   },
   { clave: 'num', titulo: 'Orden', valor: (o) => o.num, clase: 'font-mono' },
   { clave: 'actividad', titulo: 'Actividad', valor: (o) => o.actividad },
-  { clave: 'estado', titulo: 'Estado', valor: (o) => o.estado },
-  { clave: 'tecnico', titulo: 'Técnico', valor: (o) => o.tecnico ?? 'SIN ASIGNAR' },
-  { clave: 'cliente', titulo: 'Cliente', valor: (o) => o.cliente, clase: 'font-mono' },
-  { clave: 'nombre', titulo: 'Nombre', valor: (o) => o.nombre },
-  { clave: 'colonia', titulo: 'Colonia', valor: (o) => o.colonia },
+  {
+    clave: 'tecnico',
+    titulo: 'Técnico',
+    valor: (o) => o.tecnico ?? '',
+    celda: (o) => o.tecnico ?? <span className="text-xs font-semibold text-amber-700">SIN ASIGNAR</span>,
+  },
+  { clave: 'cliente', titulo: 'Cliente', valor: (o) => o.nombre, celda: (o) => <Cliente o={o} detalle={[o.cliente, o.colonia]} /> },
   { clave: 'motivo', titulo: 'Motivo', valor: (o) => o.motivo, celda: (o) => <>{o.motivo} <Marcas o={o} /></> },
-  { clave: 'apertura', titulo: 'Apertura', valor: (o) => o.fecha_ape, celda: (o) => horaLocal(o.fecha_ape) },
-  { clave: 'inicio', titulo: 'Inicio', valor: (o) => o.hora_ini, celda: (o) => horaLocal(o.hora_ini) },
+  { clave: 'estado', titulo: 'Estado', valor: (o) => o.estado, clase: 'text-xs text-slate-500' },
   {
     clave: 'gps',
-    titulo: 'GPS',
+    titulo: '',
     valor: (o) => o.gps,
     celda: (o) =>
       o.gps ? (
-        <a href={o.gps} target="_blank" rel="noreferrer" className="text-marca hover:underline" onClick={(e) => e.stopPropagation()}>
-          Ver
+        <a
+          href={o.gps}
+          target="_blank"
+          rel="noreferrer"
+          title="Ubicación del técnico"
+          className="text-marca hover:underline"
+          onClick={(e) => e.stopPropagation()}
+        >
+          GPS
         </a>
       ) : null,
   },
@@ -58,29 +75,50 @@ const COLUMNAS_CERRADAS: Columna[] = [
   { clave: 'num', titulo: 'Orden', valor: (o) => o.num, clase: 'font-mono' },
   { clave: 'actividad', titulo: 'Actividad', valor: (o) => o.actividad },
   { clave: 'tecnico', titulo: 'Técnico', valor: (o) => o.tecnico },
-  { clave: 'cliente', titulo: 'Cliente', valor: (o) => o.cliente, clase: 'font-mono' },
-  { clave: 'nombre', titulo: 'Nombre', valor: (o) => o.nombre },
-  { clave: 'inicio', titulo: 'Inicio', valor: (o) => o.hora_ini, celda: (o) => horaLocal(o.hora_ini) },
+  { clave: 'cliente', titulo: 'Cliente', valor: (o) => o.nombre, celda: (o) => <Cliente o={o} detalle={[o.cliente]} /> },
   { clave: 'cierre', titulo: 'Cierre', valor: (o) => o.hora_liq, celda: (o) => horaLocal(o.hora_liq) },
   { clave: 'tiempo', titulo: 'Tiempo', valor: (o) => o.tiempo_real_min, celda: (o) => duracion(o.tiempo_real_min) },
-  { clave: 'razon', titulo: 'Razón de cierre', valor: (o) => o.razon_cierre },
+  { clave: 'razon', titulo: 'Razón de cierre', valor: (o) => o.razon_cierre, clase: 'text-xs' },
+]
+
+// El CSV lleva todos los datos, aunque la tabla muestre menos columnas.
+const COLUMNAS_CSV: [string, (o: Orden) => string | number | null][] = [
+  ['Orden', (o) => o.num],
+  ['Días de retraso', (o) => o.dias_retraso],
+  ['Actividad', (o) => o.actividad],
+  ['Estado', (o) => o.estado],
+  ['Técnico', (o) => o.tecnico],
+  ['Vehículo', (o) => o.mx],
+  ['Cliente', (o) => o.cliente],
+  ['Nombre', (o) => o.nombre],
+  ['Colonia', (o) => o.colonia],
+  ['Sector', (o) => o.sector],
+  ['Motivo', (o) => o.motivo],
+  ['Offline', (o) => (o.es_offline ? 'Sí' : '')],
+  ['Más de 2 h', (o) => (o.alerta_tiempo ? 'Sí' : '')],
+  ['Apertura', (o) => horaLocal(o.fecha_ape)],
+  ['Inicio', (o) => horaLocal(o.hora_ini)],
+  ['Cierre', (o) => horaLocal(o.hora_liq)],
+  ['Tiempo (min)', (o) => o.tiempo_real_min],
+  ['OLT', (o) => o.olt],
+  ['PON', (o) => o.pon],
+  ['Comentario', (o) => o.comentario],
+  ['Razón de cierre', (o) => o.razon_cierre],
+  ['Comentario de cierre', (o) => o.comentario_cierre],
 ]
 
 const POR_PAGINA = 50
 
-function exportarCsv(ordenes: Orden[], columnas: Columna[], nombre: string) {
+function exportarCsv(ordenes: Orden[], nombre: string) {
   const escapar = (v: unknown) => {
     let texto = String(v ?? '')
     // Un comentario que empiece con = + - @ se ejecutaría como fórmula al abrirlo en Excel.
     if (typeof v === 'string' && /^[=+\-@]/.test(texto)) texto = `'${texto}`
     return `"${texto.replaceAll('"', '""')}"`
   }
-  const filas = [
-    [...columnas.map((c) => c.titulo), 'Comentario', 'Comentario de cierre'],
-    ...ordenes.map((o) => [...columnas.map((c) => c.valor(o)), o.comentario, o.comentario_cierre]),
-  ]
+  const filas = [COLUMNAS_CSV.map(([titulo]) => titulo), ...ordenes.map((o) => COLUMNAS_CSV.map(([, valor]) => valor(o)))]
   // BOM para que Excel respete los acentos.
-  const contenido = '﻿' + filas.map((f) => f.map(escapar).join(',')).join('\r\n')
+  const contenido = '\ufeff' + filas.map((f) => f.map(escapar).join(',')).join('\r\n')
   const enlace = document.createElement('a')
   enlace.href = URL.createObjectURL(new Blob([contenido], { type: 'text/csv;charset=utf-8' }))
   enlace.download = nombre
@@ -174,7 +212,7 @@ export default function TablaOrdenes({
         <button
           className="boton-secundario ml-auto"
           disabled={!filas.length}
-          onClick={() => exportarCsv(filas, columnas, `ordenes_${vista}_${new Date().toISOString().slice(0, 10)}.csv`)}
+          onClick={() => exportarCsv(filas, `ordenes_${vista}_${new Date().toISOString().slice(0, 10)}.csv`)}
         >
           Descargar CSV
         </button>

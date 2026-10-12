@@ -2,10 +2,9 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 
 import { api, parametros } from '../api'
+import BarraFiltros from '../componentes/BarraFiltros'
 import { AvanceSegmentos, Kpis, TableroCarga } from '../componentes/Indicadores'
-import PanelFiltros from '../componentes/PanelFiltros'
 import TablaOrdenes from '../componentes/TablaOrdenes'
-import { filtrosActivos } from '../filtros'
 import { useEventosEnVivo } from '../useEventosEnVivo'
 import type { Filtros, OpcionesFiltro, Orden, ResumenMonitor } from '../tipos'
 import { FILTROS_VACIOS } from '../tipos'
@@ -14,8 +13,10 @@ import { FILTROS_VACIOS } from '../tipos'
 // depende de la hora (días de retraso, alerta de 2 h).
 const REFRESCO_MS = 5 * 60_000
 
-const CLAVE_FILTROS = 'monitor.filtros'
+const CLAVE_FILTROS = 'monitor.filtros.v2'
 const SIN_ORDENES: Orden[] = []
+
+type Pestana = 'pendientes' | 'cerradas_hoy' | 'carga' | 'avance'
 
 function filtrosGuardados(): Filtros {
   try {
@@ -28,8 +29,7 @@ function filtrosGuardados(): Filtros {
 
 export default function Monitor() {
   const [filtros, setFiltrosEstado] = useState<Filtros>(filtrosGuardados)
-  const [vista, setVista] = useState<'pendientes' | 'cerradas_hoy'>('pendientes')
-  const [verFiltros, setVerFiltros] = useState(false)
+  const [pestana, setPestana] = useState<Pestana>('pendientes')
   const enVivo = useEventosEnVivo()
 
   const setFiltros = (f: Filtros) => {
@@ -41,6 +41,7 @@ export default function Monitor() {
     }
   }
 
+  const vistaTabla = pestana === 'cerradas_hoy' ? 'cerradas_hoy' : 'pendientes'
   const resumen = useQuery({
     queryKey: ['monitor', 'resumen', filtros],
     queryFn: () => api<ResumenMonitor>(`/monitor/resumen${parametros(filtros)}`),
@@ -48,79 +49,85 @@ export default function Monitor() {
     placeholderData: keepPreviousData,
   })
   const ordenes = useQuery({
-    queryKey: ['monitor', 'ordenes', vista, filtros],
-    queryFn: () => api<Orden[]>(`/monitor/ordenes${parametros(filtros, { vista })}`),
+    queryKey: ['monitor', 'ordenes', vistaTabla, filtros],
+    queryFn: () => api<Orden[]>(`/monitor/ordenes${parametros(filtros, { vista: vistaTabla })}`),
     refetchInterval: REFRESCO_MS,
     placeholderData: keepPreviousData,
+    enabled: pestana === 'pendientes' || pestana === 'cerradas_hoy',
   })
   const opciones = useQuery({
     queryKey: ['monitor', 'filtros'],
     queryFn: () => api<OpcionesFiltro>('/monitor/filtros'),
   })
 
-  const activos = filtrosActivos(filtros)
   const r = resumen.data
+  const pestanas: { valor: Pestana; texto: string; corto?: string; cuenta?: number }[] = [
+    { valor: 'pendientes', texto: 'Pendientes', cuenta: r?.kpis.total_pendientes },
+    { valor: 'cerradas_hoy', texto: 'Cerradas hoy', corto: 'Cerradas', cuenta: r?.kpis.cerradas_hoy },
+    { valor: 'carga', texto: 'Carga' },
+    { valor: 'avance', texto: 'Avance' },
+  ]
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-bold text-slate-900">Monitor en vivo</h1>
-        <span className={`text-xs ${enVivo ? 'text-emerald-600' : 'text-slate-400'}`}>
-          {enVivo ? '● Actualización automática' : '○ Actualiza cada 5 min'}
+    <div className="space-y-3">
+      <div className="flex items-baseline gap-3">
+        <h1 className="text-lg font-bold text-slate-900">Monitor en vivo</h1>
+        <span
+          className={`text-xs ${enVivo ? 'text-emerald-600' : 'text-slate-400'}`}
+          title={enVivo ? 'Se actualiza solo cuando el robot trae datos nuevos' : 'Sin conexión en vivo: se actualiza cada 5 min'}
+        >
+          {enVivo ? '● En vivo' : '○ Cada 5 min'}
         </span>
-        <button className="boton-secundario ml-auto" onClick={() => setVerFiltros((v) => !v)}>
-          Filtros{activos.length ? ` (${activos.length})` : ''}
-        </button>
       </div>
 
-      {verFiltros && <PanelFiltros filtros={filtros} opciones={opciones.data} alCambiar={setFiltros} />}
-
-      {activos.length > 0 && r && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          <strong>Hay filtros ocultando información:</strong> {activos.join(' · ')}. Se muestran{' '}
-          <strong>{r.mostrando}</strong> de <strong>{r.total_base}</strong> órdenes.{' '}
-          <button className="font-semibold underline" onClick={() => setFiltros(FILTROS_VACIOS)}>
-            Quitar filtros
-          </button>
-        </div>
-      )}
-
-      {r && r.estados_no_reconocidos.length > 0 && (
-        <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          Hay órdenes con un estado que el monitor no reconoce (no cuentan como pendientes ni como cerradas):{' '}
-          {r.estados_no_reconocidos.map((e) => `${e.nombre} (${e.cantidad})`).join(', ')}. Avisa a soporte para
-          agregarlos.
-        </div>
-      )}
+      <BarraFiltros
+        filtros={filtros}
+        opciones={opciones.data}
+        conteos={r?.rapidos}
+        alCambiar={setFiltros}
+      />
 
       {resumen.error && (
-        <div className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
+        <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">
           No se pudo cargar el resumen: {resumen.error.message}
-        </div>
+        </p>
       )}
+      {r ? <Kpis kpis={r.kpis} /> : !resumen.error && <div className="tarjeta h-16 animate-pulse" />}
 
-      {r ? (
-        <>
-          <Kpis kpis={r.kpis} />
-          <TableroCarga resumen={r} />
-          <AvanceSegmentos consolidado={r.consolidado} />
-        </>
-      ) : (
-        !resumen.error && <div className="tarjeta h-40 animate-pulse" />
-      )}
-
-      <div className="flex gap-1 rounded-lg bg-slate-200 p-1 text-sm font-medium sm:w-fit">
-        {(['pendientes', 'cerradas_hoy'] as const).map((v) => (
+      <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 text-sm font-medium">
+        {pestanas.map((p) => (
           <button
-            key={v}
-            onClick={() => setVista(v)}
-            className={`flex-1 rounded-md px-4 py-1.5 sm:flex-none ${vista === v ? 'bg-white shadow-sm' : 'text-slate-600'}`}
+            key={p.valor}
+            onClick={() => setPestana(p.valor)}
+            className={`-mb-px border-b-2 px-2 py-2 whitespace-nowrap sm:px-3 ${
+              pestana === p.valor ? 'border-marca text-marca' : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
           >
-            {v === 'pendientes' ? 'Pendientes' : 'Cerradas hoy'}
+            {p.corto ? (
+              <>
+                <span className="sm:hidden">{p.corto}</span>
+                <span className="hidden sm:inline">{p.texto}</span>
+              </>
+            ) : (
+              p.texto
+            )}
+            {p.cuenta !== undefined && <span className="ml-1.5 text-xs text-slate-400 tabular-nums">{p.cuenta}</span>}
           </button>
         ))}
-      </div>
-      <TablaOrdenes key={vista} vista={vista} ordenes={ordenes.data ?? SIN_ORDENES} cargando={ordenes.isPending} />
+      </nav>
+
+      {(pestana === 'pendientes' || pestana === 'cerradas_hoy') && (
+        <TablaOrdenes key={vistaTabla} vista={vistaTabla} ordenes={ordenes.data ?? SIN_ORDENES} cargando={ordenes.isPending} />
+      )}
+      {pestana === 'carga' && r && <TableroCarga resumen={r} />}
+      {pestana === 'avance' && r && <AvanceSegmentos consolidado={r.consolidado} />}
+
+      {r && r.estados_no_reconocidos.length > 0 && (
+        <p className="text-xs text-amber-700">
+          Estados que el monitor no reconoce (no cuentan como pendientes ni cerradas):{' '}
+          {r.estados_no_reconocidos.map((e) => `${e.nombre} (${e.cantidad})`).join(', ')}. Avisa a soporte.
+        </p>
+      )}
     </div>
   )
 }

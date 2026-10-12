@@ -10,21 +10,21 @@ const COLOR_CUBETA: Record<string, string> = {
 
 function TarjetaKpi({ titulo, valor, color }: { titulo: string; valor: number; color: string }) {
   return (
-    <div className={`tarjeta border-l-4 p-4 ${color}`}>
-      <p className="etiqueta">{titulo}</p>
-      <p className="mt-1 text-3xl font-bold text-slate-900 tabular-nums">{valor.toLocaleString('es-HN')}</p>
+    <div className={`tarjeta border-l-4 px-2.5 py-2 sm:px-3 ${color}`}>
+      <p className="text-[10px] leading-tight font-semibold tracking-wide text-slate-500 uppercase sm:text-[11px]">{titulo}</p>
+      <p className="text-xl font-bold text-slate-900 tabular-nums sm:text-2xl">{valor.toLocaleString('es-HN')}</p>
     </div>
   )
 }
 
+// El total de pendientes no va aquí: ya está en el botón "Todas" y en la pestaña "Pendientes".
 export function Kpis({ kpis }: { kpis: ResumenMonitor['kpis'] }) {
   return (
-    <section className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
-      <TarjetaKpi titulo="Pendientes asignadas" valor={kpis.pendientes_asignadas} color="border-l-marca" />
+    <section className="grid grid-cols-4 gap-2">
+      <TarjetaKpi titulo="Asignadas" valor={kpis.pendientes_asignadas} color="border-l-marca" />
       <TarjetaKpi titulo="Cerradas hoy" valor={kpis.cerradas_hoy} color="border-l-emerald-500" />
       <TarjetaKpi titulo="Técnicos en ruta" valor={kpis.tecnicos_en_ruta} color="border-l-amber-500" />
-      <TarjetaKpi titulo="Caídas (offline)" valor={kpis.offline} color="border-l-red-500" />
-      <TarjetaKpi titulo="Total pendientes" valor={kpis.total_pendientes} color="border-l-slate-400" />
+      <TarjetaKpi titulo="Offline" valor={kpis.offline} color="border-l-red-500" />
     </section>
   )
 }

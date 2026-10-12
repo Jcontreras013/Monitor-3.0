@@ -53,7 +53,7 @@ Reescritura de [monitor-operativo](https://github.com/Jcontreras013/monitor-oper
 |---|---|---|
 | 0 | Repositorio, PostgreSQL, migraciones, CI, Docker | ✅ |
 | 1 | Robot Cepheus → Postgres e importación del historial de Sheets | ✅ |
-| 2 | Login, roles, Monitor en vivo (KPIs, tablero de carga, avance por segmento, filtros, tabla con detalle y CSV) | ✅ |
+| 2 | Login, roles, Monitor en vivo (filtros rápidos con conteo, KPIs, pestañas de pendientes / cerradas / carga / avance, detalle de orden y CSV) | ✅ |
 | 3 | Control de Calidad y Expedientes | Pendiente |
 | 4 | Centro de Reportes (PDF/Excel), Reprogramadas / No instalados, Gantt | Pendiente |
 | 5 | Bot de Telegram y alertas por correo (VIP, molex) | Pendiente |
@@ -138,6 +138,7 @@ Para traer historial más viejo una sola vez: `uv run python -m worker.sync --ba
 - **Sin catálogo FTTX el ciclo sigue**: antes se abortaba. El vehículo (MX) solo se completa si el catálogo existe.
 - **"Cerradas hoy" se mantiene igual**: a `HORA_LIQ` se le restan 6 h y se compara con la fecha de hoy. Entre las 00:00 y las 06:00 eso da 0 cerradas del "día nuevo", aunque operativamente sigue la jornada anterior. Se dejó igual para que los números cuadren en la comparación; conviene decidir si se pasa a día operativo completo.
 - **Ventana del Monitor**: se cargan las órdenes vivas y las abiertas o cerradas en los últimos 7 días. Ya no entran las órdenes viejas sin hora de liquidación, que solo afectaban el aviso de "estados no reconocidos".
+- **Filtros rápidos exclusivos**: Todas / Críticas / No asignadas son botones con su conteo y se elige uno a la vez. Antes eran dos interruptores que se podían combinar ("críticas sin técnico"). Actividad, estado, motivo y técnico sí se combinan con cualquiera de los tres.
 - **Contraseñas**: cualquier rol puede cambiar la suya (antes solo admin y jefe), con un mínimo de 8 caracteres.
 
 ## Estructura

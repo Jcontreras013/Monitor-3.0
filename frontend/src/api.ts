@@ -41,8 +41,8 @@ export function parametros(filtros: Filtros, extra: Record<string, string> = {})
   filtros.estado.forEach((v) => p.append('estado', v))
   filtros.motivo.forEach((v) => p.append('motivo', v))
   if (filtros.tecnico) p.set('tecnico', filtros.tecnico)
-  if (filtros.solo_criticas) p.set('solo_criticas', 'true')
-  if (filtros.no_asignadas) p.set('no_asignadas', 'true')
+  if (filtros.rapido === 'criticas') p.set('solo_criticas', 'true')
+  if (filtros.rapido === 'no_asignadas') p.set('no_asignadas', 'true')
   const texto = p.toString()
   return texto ? `?${texto}` : ''
 }

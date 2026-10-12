@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Iterable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta
 from typing import Protocol
 
@@ -186,6 +186,10 @@ def calcular_resumen(ordenes: Iterable[OrdenLike], filtros: Filtros, ahora: date
     conteo_ins = Counter(o.subtipo_tablero for o in ins)
     plex = [o for o in pend if es_plex(o.actividad) and tecnico_asignado(o.tecnico)]
 
+    # Cuántas pendientes deja ver cada filtro rápido, con los demás filtros
+    # aplicados (los números que muestran los botones Todas / Críticas / No asignadas).
+    sin_rapidos = pendientes(aplicar_filtros(base, replace(filtros, solo_criticas=False, no_asignadas=False), ahora))
+
     no_reconocidos = Counter(
         (o.estado or "(vacío)") for o in filtradas
         if not o.es_viva and not any(t in o.estado for t in c.ESTADOS_TERMINALES)
@@ -202,6 +206,11 @@ def calcular_resumen(ordenes: Iterable[OrdenLike], filtros: Filtros, ahora: date
             "tecnicos_en_ruta": 0 if filtros.no_asignadas else len({o.tecnico for o in foco}),
             "offline": sum(1 for o in pend if o.es_offline),
             "total_pendientes": len(pend),
+        },
+        "rapidos": {
+            "todas": len(sin_rapidos),
+            "criticas": sum(1 for o in sin_rapidos if es_critica(o, ahora)),
+            "no_asignadas": sum(1 for o in sin_rapidos if not tecnico_asignado(o.tecnico)),
         },
         "retraso": [
             {"cubeta": k, "cantidad": retrasos.get(k, 0), "porcentaje": _pct(retrasos.get(k, 0), total_retraso)}

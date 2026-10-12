@@ -40,6 +40,12 @@ class Kpis(BaseModel):
     total_pendientes: int
 
 
+class ConteosRapidos(BaseModel):
+    todas: int
+    criticas: int
+    no_asignadas: int
+
+
 class CubetaRetraso(BaseModel):
     cubeta: str
     cantidad: int
@@ -77,6 +83,7 @@ class ResumenMonitor(BaseModel):
     mostrando: int
     total_base: int
     kpis: Kpis
+    rapidos: ConteosRapidos
     retraso: list[CubetaRetraso]
     tablero: Tablero
     consolidado: list[Consolidado]
