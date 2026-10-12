@@ -12,6 +12,10 @@ RUN pnpm build
 
 # --- 2. Backend (FastAPI) ------------------------------------------------------
 FROM python:3.12-slim
+# Librerías que WeasyPrint necesita para generar los PDF (texto y fuentes).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir uv==0.11.32
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \

@@ -3,8 +3,9 @@ Datos de demostración para probar la app sin acceso a Cepheus.
 
     ENTORNO=desarrollo python -m scripts.datos_demo
 
-Crea el usuario `demo` (contraseña `demo-monitor`, rol admin) y unas 400
-órdenes inventadas. Se niega a correr fuera de ENTORNO=desarrollo.
+Crea el usuario `demo` (contraseña `demo-monitor`, rol admin), unas 400
+órdenes, un catálogo de personal y faltas de ejemplo, todo inventado.
+Se niega a correr fuera de ENTORNO=desarrollo.
 """
 
 from __future__ import annotations
@@ -19,9 +20,10 @@ from sqlalchemy import select
 from app import repositorio
 from app.config import get_settings
 from app.db import crear_engine, crear_sesiones
+from app.dominio.expedientes import AREA_OPERACIONES
 from app.dominio.fechas import ahora_hn
 from app.dominio.normalizacion import normalizar_orden
-from app.models import Usuario
+from app.models import Expediente, Personal, Usuario
 from app.security import cifrar_clave
 
 TECNICOS = ["Carlos Mejía", "Ana Rodríguez", "Luis Hernández", "María López", "José Martínez",
@@ -33,6 +35,33 @@ INSTALACION = ["instalacion nueva", "ADICION de tv", "cambio de plan", "recupera
 ACTIVIDADES = [("SOPFIBRA", SOPORTE, 45), ("INSFIBRA", INSTALACION, 25), ("SOPFIBRACORP", SOPORTE, 8),
                ("PEXTERNO", ["revision de tramo"], 6), ("SPLITTEROPT", ["caja splitter"], 4),
                ("INSFIBRACORP", INSTALACION, 5), ("TRASLADOEXTFIBRA", ["traslado"], 4), ("CEQUI", ["cambio equipo"], 3)]
+
+
+ADMINISTRATIVOS = {"SAC": ["SAYRA ESCOBAR", "AMY JEREZANO", "DENZEL BODDEN"], "BODEGA": ["CARLOS GARCIA"]}
+FALTAS = [
+    ("LLEGADA TARDE", "Llegó a las 8:25 am"), ("LLEGADA TARDE", "Llegó 8:40, tráfico"),
+    ("EXCESO DE VELOCIDAD", "GPS marcó 92 km/h en zona urbana"), ("MALA DOCUMENTACIÓN", "Orden sin fotos de cierre"),
+    ("ABANDONO DE RUTA", "Se retiró de la zona asignada sin avisar"), ("INCIDENCIA MÉDICA", "Cita en el IHSS"),
+]
+
+
+def generar_expedientes() -> list[Expediente]:
+    random.seed(11)
+    hoy = ahora_hn().date()
+    registros = []
+    for _ in range(26):
+        tipo, comentario = random.choice(FALTAS)
+        registros.append(Expediente(
+            colaborador=random.choice(TECNICOS).upper(), area=AREA_OPERACIONES, tipo_falta=tipo, comentario=comentario,
+            fecha_incidencia=hoy - timedelta(days=random.randint(0, 45)), supervisor="Usuario Demo", origen="app",
+            urls_externas=[]))
+    for area, nombres in ADMINISTRATIVOS.items():
+        for nombre in nombres:
+            registros.append(Expediente(
+                colaborador=nombre, area=area, tipo_falta=random.choice(["LLEGADA TARDÍA", "AMONESTACIÓN ESCRITA"]),
+                comentario="Registro de demostración", fecha_incidencia=hoy - timedelta(days=random.randint(0, 20)),
+                supervisor="Usuario Demo", origen="app", urls_externas=[]))
+    return registros
 
 
 def generar(n: int = 400) -> list[dict]:
@@ -72,8 +101,15 @@ async def principal() -> None:
     try:
         async with crear_sesiones(engine)() as sesion:
             if not await sesion.scalar(select(Usuario).where(Usuario.usuario == "demo")):
-                sesion.add(Usuario(usuario="demo", nombre="Usuario Demo", rol="admin",
+                sesion.add(Usuario(usuario="demo", nombre="Usuario Demo", rol="admin", acceso_repositorio=True,
                                    clave_hash=cifrar_clave("demo-monitor")))
+            if not await sesion.scalar(select(Personal).limit(1)):
+                sesion.add_all([Personal(nombre=t.upper(), area=AREA_OPERACIONES, cargo="TECNICO PRINCIPAL",
+                                         clasificacion="TÉCNICO PRINCIPAL") for t in TECNICOS])
+                sesion.add_all([Personal(nombre=n, area=a, clasificacion="ADMINISTRATIVO")
+                                for a, nombres in ADMINISTRATIVOS.items() for n in nombres])
+            if not await sesion.scalar(select(Expediente).limit(1)):
+                sesion.add_all(generar_expedientes())
             ordenes = [o for c in generar() if (o := normalizar_orden(c))]
             cambiadas = await repositorio.guardar_ordenes(sesion, ordenes)
             await sesion.commit()

@@ -1,6 +1,12 @@
 // Formas que devuelve la API (backend/app/schemas.py).
 
-export type Usuario = { usuario: string; nombre: string; rol: string }
+export type Usuario = {
+  usuario: string
+  nombre: string
+  rol: string
+  modulos: string[]
+  acceso_repositorio: boolean
+}
 
 export type Conteo = { nombre: string; cantidad: number }
 
@@ -103,3 +109,59 @@ export const FILTROS_VACIOS: Filtros = {
   estado: [],
   motivo: [],
 }
+
+// ---------------------------------------------------------------------------
+// Expedientes
+// ---------------------------------------------------------------------------
+export type ArchivoMeta = {
+  id: string
+  nombre: string
+  mime: string
+  tamano: number
+  descripcion: string
+  subido_por: string
+  creado_en: string
+}
+
+export type RegistroExpediente = {
+  id: number
+  fecha_registro: string
+  fecha_incidencia: string
+  colaborador: string
+  area: string
+  tipo_falta: string
+  comentario: string
+  supervisor: string
+  origen: string
+  clasificacion: 'GRAVE' | 'LEVE' | 'OTRO'
+  archivos: ArchivoMeta[]
+  urls_externas: string[]
+}
+
+export type ListadoExpedientes = {
+  registros: RegistroExpediente[]
+  panel: {
+    total: number
+    personas: number
+    rubro_dominante: string | null
+    clasificacion: Record<'GRAVE' | 'LEVE' | 'OTRO', number>
+    reincidentes: { colaborador: string; motivo: string; veces: number }[]
+    por_dia: Conteo[]
+    por_rubro: Conteo[]
+    por_motivo: Conteo[]
+  }
+  mes: string
+  resumen_mes: { colaborador: string; tardes: number; otras: number; total: number }[]
+  colaboradores: string[]
+  areas: string[]
+}
+
+export type CatalogoExpedientes = {
+  personal: Record<string, string[]>
+  motivos_operaciones: string[]
+  motivos_administrativo: string[]
+}
+
+export type ConsolidadoMes = { mes: string; total: number; filas: { colaborador: string; faltas: number }[] }
+
+export type CarpetaRepositorio = { colaborador: string; archivos: ArchivoMeta[] }

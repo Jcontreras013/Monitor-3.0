@@ -25,6 +25,8 @@ class UsuarioOut(BaseModel):
     usuario: str
     nombre: str
     rol: str
+    modulos: list[str] = []
+    acceso_repositorio: bool = False
 
 
 class Conteo(BaseModel):

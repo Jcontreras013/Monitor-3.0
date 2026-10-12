@@ -1,10 +1,17 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useRef, useState } from 'react'
+import { NavLink } from 'react-router'
 
 import { api, enviar } from '../api'
 import { haceCuanto } from '../formato'
+import type { Modulo } from '../modulos'
 import type { EstadoRobot, Usuario } from '../tipos'
 import CambiarClave from './CambiarClave'
+
+const claseEnlace = ({ isActive }: { isActive: boolean }) =>
+  `rounded-md px-3 py-1.5 text-sm font-medium whitespace-nowrap transition ${
+    isActive ? 'bg-white/15 text-white' : 'text-slate-300 hover:bg-white/10 hover:text-white'
+  }`
 
 function IndicadorRobot() {
   const { data: estado } = useQuery({
@@ -35,7 +42,7 @@ function IndicadorRobot() {
   )
 }
 
-export default function Encabezado({ usuario }: { usuario: Usuario }) {
+export default function Encabezado({ usuario, modulos }: { usuario: Usuario; modulos: Modulo[] }) {
   const clienteQuery = useQueryClient()
   const [menuAbierto, setMenuAbierto] = useState(false)
   const [cambiandoClave, setCambiandoClave] = useState(false)
@@ -65,6 +72,13 @@ export default function Encabezado({ usuario }: { usuario: Usuario }) {
           </span>
           <span className="hidden text-xs text-slate-400 sm:inline">3.0</span>
         </div>
+        <nav className="hidden items-center gap-1 md:flex">
+          {modulos.map((m) => (
+            <NavLink key={m.clave} to={m.ruta} className={claseEnlace}>
+              {m.titulo}
+            </NavLink>
+          ))}
+        </nav>
         <IndicadorRobot />
         <div className="relative ml-auto" ref={menu}>
           <button className="boton text-slate-200 hover:bg-white/10" onClick={() => setMenuAbierto((v) => !v)}>
@@ -91,6 +105,15 @@ export default function Encabezado({ usuario }: { usuario: Usuario }) {
           )}
         </div>
       </div>
+      {modulos.length > 1 && (
+        <nav className="flex gap-1 overflow-x-auto border-t border-white/10 px-3 py-1.5 md:hidden">
+          {modulos.map((m) => (
+            <NavLink key={m.clave} to={m.ruta} className={claseEnlace}>
+              {m.titulo}
+            </NavLink>
+          ))}
+        </nav>
+      )}
       {cambiandoClave && <CambiarClave alCerrar={() => setCambiandoClave(false)} />}
     </header>
   )

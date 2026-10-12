@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block titulo %}Consolidado mensual de faltas{% endblock %}
+{% block estilos %}
+  .rojo td { background: #ffe1e1 !important; }
+  td, th { font-size: 10pt; padding: 5px 8px; }
+{% endblock %}
+{% block contenido %}
+  <h1>CONSOLIDADO MENSUAL DE FALTAS</h1>
+  <div class="sub">{{ mes | capitalize }}</div>
+  {% if not filas %}
+    <p class="vacio" style="color:#0a7a2f">Nadie tiene faltas registradas este mes.</p>
+  {% else %}
+    <p><strong>Total de faltas del mes: {{ total }}</strong> · Colaboradores con faltas: {{ filas | length }}</p>
+    <p class="nota" style="color:#963c3c">Resaltado en rojo: colaboradores con 3 o más faltas este mes.</p>
+    <table>
+      <thead><tr><th>Colaborador</th><th class="centro" style="width:30%">Faltas del mes</th></tr></thead>
+      <tbody>
+      {% for f in filas %}
+        <tr class="{{ 'rojo' if f.faltas >= 3 }}"><td>{{ f.colaborador }}</td><td class="centro">{{ f.faltas }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  {% endif %}
+{% endblock %}

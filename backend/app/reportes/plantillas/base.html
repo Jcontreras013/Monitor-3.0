@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>{% block titulo %}Reporte{% endblock %}</title>
+<style>
+  @page {
+    size: {% block tamano %}letter{% endblock %};
+    margin: 26mm 14mm 20mm 14mm;
+    @top-left { content: element(encabezado); width: 100%; vertical-align: bottom; }
+    @bottom-center {
+      content: "{{ marca.pie }}   ·   Página " counter(page) " de " counter(pages);
+      font-size: 7pt; color: #8a8f99;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 8.5pt; color: #1f2430; }
+  .encabezado { position: running(encabezado); width: 100%; display: flex; align-items: center;
+                justify-content: space-between; border-bottom: 1px solid #c9ccd3; padding-bottom: 4px; }
+  .encabezado img { height: 22px; }
+  .encabezado .derecha { text-align: right; }
+  .encabezado .depto { font-weight: bold; font-size: 9pt; }
+  .encabezado .tag { font-size: 7.5pt; color: #6b7280; }
+  h1 { font-size: 15pt; color: #28326a; text-align: center; margin: 0 0 2px; }
+  .sub { text-align: center; color: #555; margin-bottom: 12px; }
+  h2 { font-size: 10.5pt; color: #28326a; margin: 16px 0 6px; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 8px; page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+  th { background: #28326a; color: #fff; font-size: 7.5pt; text-transform: uppercase; padding: 4px 5px; text-align: left; }
+  td { border: 1px solid #d5d8de; padding: 3px 5px; vertical-align: top; }
+  tbody tr:nth-child(even) td { background: #f5f6fa; }
+  .num { text-align: right; white-space: nowrap; }
+  .centro { text-align: center; }
+  .kpis { display: flex; gap: 8px; margin: 6px 0 10px; }
+  .kpi { flex: 1; border: 1px solid #d5d8de; border-left: 4px solid #28326a; padding: 6px 8px; }
+  .kpi .etq { font-size: 7pt; color: #6b7280; text-transform: uppercase; font-weight: bold; }
+  .kpi .val { font-size: 16pt; font-weight: bold; }
+  .nota { font-size: 7pt; color: #6b7280; font-style: italic; }
+  .vacio { text-align: center; color: #6b7280; font-style: italic; padding: 20px; }
+  .salto { page-break-before: always; }
+  {% block estilos %}{% endblock %}
+</style>
+</head>
+<body>
+  <div class="encabezado">
+    <img src="{{ logo }}" alt="MAXCOM">
+    <div class="derecha">
+      <div class="depto">MAXCOM - DEPARTAMENTO DE CONTROL OPERATIVO</div>
+      <div class="tag">{{ marca.tagline }}</div>
+    </div>
+  </div>
+  {% block contenido %}{% endblock %}
+</body>
+</html>

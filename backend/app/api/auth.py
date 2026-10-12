@@ -9,6 +9,7 @@ from sqlalchemy import select
 
 from app.deps import Config, SesionDB, UsuarioActual, poner_cookie_sesion
 from app.models import Usuario
+from app.permisos import modulos_de
 from app.schemas import CambioClaveIn, LoginIn, UsuarioOut
 from app.security import COOKIE_SESION, cifrar_clave, clave_coincide
 
@@ -45,7 +46,7 @@ async def login(datos: LoginIn, response: Response, db: SesionDB, settings: Conf
 
     _fallos.pop(nombre_usuario, None)
     poner_cookie_sesion(response, usuario, settings)
-    return usuario
+    return usuario_out(usuario)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -55,7 +56,13 @@ async def logout(response: Response):
 
 @router.get("/me", response_model=UsuarioOut)
 async def yo(usuario: UsuarioActual):
-    return usuario
+    return usuario_out(usuario)
+
+
+def usuario_out(usuario: Usuario) -> UsuarioOut:
+    salida = UsuarioOut.model_validate(usuario)
+    salida.modulos = modulos_de(usuario.rol)
+    return salida
 
 
 @router.post("/cambiar-clave", status_code=status.HTTP_204_NO_CONTENT)

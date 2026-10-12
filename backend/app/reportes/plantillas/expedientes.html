@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block titulo %}Reporte consolidado de expedientes{% endblock %}
+{% block estilos %}
+  .seccion-titulo { color: #fff; font-weight: bold; padding: 5px 8px; margin-top: 14px; }
+  .GRAVE { background: #b41e1e; } .LEVE { background: #c88c14; } .OTRO { background: #505f73; }
+  .desc { font-size: 7pt; color: #6b7280; font-style: italic; margin: 2px 0 4px; }
+  .rojo td { background: #ffe1e1 !important; }
+  .anexo { page-break-inside: avoid; margin-bottom: 14px; }
+  .anexo .pie { background: #f0f0f0; border: 1px solid #ccc; padding: 4px 6px; font-weight: bold; }
+  .anexo img { max-width: 100%; max-height: 180mm; margin-top: 4px; }
+{% endblock %}
+{% block contenido %}
+  <h1>REPORTE CONSOLIDADO DE EXPEDIENTES</h1>
+  <div class="sub">{{ descripcion }} · Generado el {{ generado | fecha_hora }}</div>
+
+  {% if not secciones %}
+    <p class="vacio">No hay registros para los filtros elegidos.</p>
+  {% else %}
+    <h2>Resumen por nivel de gravedad</h2>
+    <div class="kpis">
+      <div class="kpi" style="border-left-color:#c88c14"><div class="etq">Faltas leves</div><div class="val">{{ conteo.LEVE }}</div></div>
+      <div class="kpi" style="border-left-color:#b41e1e"><div class="etq">Faltas graves</div><div class="val">{{ conteo.GRAVE }}</div></div>
+      <div class="kpi" style="border-left-color:#505f73"><div class="etq">Otras incidencias</div><div class="val">{{ conteo.OTRO }}</div></div>
+    </div>
+    <p class="nota">Las llegadas tarde se clasifican como LEVE hasta 2 ocurrencias por colaborador; a partir de la 3.ª pasan a GRAVE.</p>
+
+    {% for s in secciones %}
+      <div class="seccion-titulo {{ s.clave }}">{{ s.etiqueta }} ({{ s.filas | length }} incidencia{{ 's' if s.filas | length != 1 }})</div>
+      <div class="desc">{{ s.descripcion }}</div>
+      <table>
+        <thead><tr><th style="width:13%">Fecha</th><th style="width:22%">Colaborador</th><th style="width:18%">Tipo de falta</th><th>Descripción</th><th style="width:12%">Supervisor</th></tr></thead>
+        <tbody>
+        {% for r in s.filas %}
+          <tr><td>{{ r.fecha_incidencia | fecha }}</td><td>{{ r.colaborador }}</td><td>{{ r.tipo_falta }}</td><td>{{ r.comentario }}</td><td>{{ r.supervisor }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% endfor %}
+
+    {% if resumen_mes %}
+      <h2>Resumen del mes — lo que va de {{ mes }}</h2>
+      <table>
+        <thead><tr><th>Colaborador</th><th class="centro">Llegadas tardías</th><th class="centro">Otras incidencias</th><th class="centro">Total</th></tr></thead>
+        <tbody>
+        {% for f in resumen_mes %}
+          <tr><td>{{ f.colaborador }}</td><td class="centro">{{ f.tardes }}</td><td class="centro">{{ f.otras }}</td><td class="centro">{{ f.total }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
+    {% if anexos or enlaces %}
+      <div class="salto"></div>
+      <h1>ANEXOS — EVIDENCIA FOTOGRÁFICA</h1>
+      {% for a in anexos %}
+        <div class="anexo">
+          <div class="pie">Evidencia: {{ a.colaborador }} | {{ a.tipo_falta }} | {{ a.fecha | fecha }}</div>
+          <img src="{{ a.imagen }}">
+        </div>
+      {% endfor %}
+      {% if enlaces %}
+        <h2>Evidencias del sistema anterior (enlaces)</h2>
+        <table>
+          <thead><tr><th>Colaborador</th><th>Fecha</th><th>Enlace</th></tr></thead>
+          <tbody>{% for e in enlaces %}<tr><td>{{ e.colaborador }}</td><td>{{ e.fecha | fecha }}</td><td>{{ e.url }}</td></tr>{% endfor %}</tbody>
+        </table>
+      {% endif %}
+    {% endif %}
+  {% endif %}
+{% endblock %}

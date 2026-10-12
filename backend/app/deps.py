@@ -11,15 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
 from app.models import Usuario
+from app.permisos import es_admin, puede
 from app.security import COOKIE_SESION, crear_token, leer_token
 
 # Se renueva la cookie si al token le quedan menos de estos minutos: así la
 # sesión vence tras SESION_MINUTOS de inactividad, igual que antes.
 _RENOVAR_SI_QUEDAN_MIN = 25
-
-# Roles con acceso solo a Expedientes (no ven el Monitor).
-ROLES_SOLO_EXPEDIENTES = frozenset({"llamados"})
-
 
 async def sesion_db(request: Request) -> AsyncIterator[AsyncSession]:
     async with request.app.state.sesiones() as sesion:
@@ -65,10 +62,22 @@ async def usuario_actual(request: Request, response: Response, db: SesionDB, set
 UsuarioActual = Annotated[Usuario, Depends(usuario_actual)]
 
 
-async def usuario_monitor(usuario: UsuarioActual) -> Usuario:
-    if usuario.rol in ROLES_SOLO_EXPEDIENTES:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Tu rol no tiene acceso al Monitor")
+def requiere(modulo: str):
+    """Dependencia: el usuario en sesión debe tener acceso al módulo."""
+
+    async def _verificar(usuario: UsuarioActual) -> Usuario:
+        if not puede(usuario.rol, modulo):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "Tu rol no tiene acceso a este módulo")
+        return usuario
+
+    return _verificar
+
+
+async def _solo_admin(usuario: UsuarioActual) -> Usuario:
+    if not es_admin(usuario.rol):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Solo un administrador puede hacer esto")
     return usuario
 
 
-UsuarioMonitor = Annotated[Usuario, Depends(usuario_monitor)]
+UsuarioMonitor = Annotated[Usuario, Depends(requiere("monitor"))]
+UsuarioAdmin = Annotated[Usuario, Depends(_solo_admin)]

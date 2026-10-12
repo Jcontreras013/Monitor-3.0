@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
+import { Suspense } from 'react'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 
 import { api, ErrorApi } from './api'
 import Encabezado from './componentes/Encabezado'
 import Login from './componentes/Login'
-import Monitor from './pantallas/Monitor'
+import { modulosDe } from './modulos'
 import type { Usuario } from './tipos'
 
 async function cargarUsuario(): Promise<Usuario | null> {
@@ -34,18 +36,31 @@ export default function App() {
   }
   if (!usuario) return <Login />
 
+  const modulos = modulosDe(usuario.modulos)
   return (
-    <div className="min-h-screen">
-      <Encabezado usuario={usuario} />
-      <main className="mx-auto max-w-[1600px] px-4 py-4 sm:px-6">
-        {usuario.rol === 'llamados' ? (
-          <p className="tarjeta p-6 text-slate-600">
-            Tu rol tiene acceso solo a Expedientes, que todavía no está migrado a esta versión.
-          </p>
-        ) : (
-          <Monitor />
-        )}
-      </main>
-    </div>
+    <BrowserRouter>
+      <div className="min-h-screen">
+        <Encabezado usuario={usuario} modulos={modulos} />
+        <main className="mx-auto max-w-[1600px] px-4 py-4 sm:px-6">
+          <Suspense fallback={<div className="tarjeta h-40 animate-pulse" />}>
+            <Routes>
+              {modulos.map((m) => (
+                <Route key={m.clave} path={`${m.ruta}/*`} element={<m.pantalla />} />
+              ))}
+              <Route
+                path="*"
+                element={
+                  modulos.length ? (
+                    <Navigate to={modulos[0].ruta} replace />
+                  ) : (
+                    <p className="tarjeta p-6 text-slate-600">Tu usuario no tiene módulos asignados.</p>
+                  )
+                }
+              />
+            </Routes>
+          </Suspense>
+        </main>
+      </div>
+    </BrowserRouter>
   )
 }

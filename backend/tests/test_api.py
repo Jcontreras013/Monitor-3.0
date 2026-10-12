@@ -19,7 +19,10 @@ async def test_login_y_sesion(cliente, crear_usuario):
 
     r = await entrar(cliente, usuario="  JAVIER ")
     assert r.status_code == 200
-    assert r.json() == {"usuario": "javier", "nombre": "Javier", "rol": "admin"}
+    assert r.json() == {
+        "usuario": "javier", "nombre": "Javier", "rol": "admin", "acceso_repositorio": False,
+        "modulos": ["monitor", "calidad", "expedientes", "reprogramadas", "reportes", "vehiculos", "configuracion"],
+    }
     assert "httponly" in r.headers["set-cookie"].lower()
 
     assert (await cliente.get("/api/auth/me")).json()["usuario"] == "javier"

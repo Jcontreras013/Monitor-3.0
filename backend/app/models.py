@@ -7,11 +7,24 @@ Estado_Robot, FTTX) y a sus espejos CSV en GCS.
 
 from __future__ import annotations
 
-from datetime import datetime
+import uuid
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text, func, text
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import (
+    Boolean,
+    Date,
+    DateTime,
+    Index,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, UUID
+from sqlalchemy.orm import Mapped, deferred, mapped_column
 
 from app.db import Base
 
@@ -88,6 +101,9 @@ class Usuario(Base):
     rol: Mapped[str] = mapped_column(String(30))
     clave_hash: Mapped[str] = mapped_column(Text)
     activo: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
+    # Acceso al repositorio de documentos laborales de Expedientes (por persona,
+    # no por rol: antes era la lista fija oscar / afajardo / jaison).
+    acceso_repositorio: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
     creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     clave_actualizada_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -115,3 +131,75 @@ class DispositivoFttx(Base):
     tecnico: Mapped[str] = mapped_column(String(160))
     mx: Mapped[str | None] = mapped_column(String(60))
     actualizado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Personal(Base):
+    """
+    Catálogo de colaboradores (antes personal_tecnico.txt y personal_sac.txt).
+    Los técnicos van en el área OPERACIONES; los administrativos, en su
+    departamento (SAC, VENTAS EN CAMPO, BODEGA...).
+    """
+
+    __tablename__ = "personal"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    nombre: Mapped[str] = mapped_column(String(200))
+    area: Mapped[str] = mapped_column(String(80))
+    cargo: Mapped[str] = mapped_column(String(120), default="")
+    # TÉCNICO PRINCIPAL | AYUDANTE | SUPERVISOR | OTRAS ÁREAS / SOPORTE
+    clasificacion: Mapped[str] = mapped_column(String(60), default="")
+    estatus: Mapped[str] = mapped_column(String(30), default="ACTIVO")
+    activo: Mapped[bool] = mapped_column(Boolean, default=True, server_default=text("true"))
+
+    __table_args__ = (UniqueConstraint("nombre", "area", name="uq_personal_nombre_area"),)
+
+
+class Expediente(Base):
+    """Una falta, incidencia o registro de personal (antes la pestaña Expedientes)."""
+
+    __tablename__ = "expedientes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    fecha_registro: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    colaborador: Mapped[str] = mapped_column(String(200))
+    area: Mapped[str] = mapped_column(String(80))
+    tipo_falta: Mapped[str] = mapped_column(String(200))
+    fecha_incidencia: Mapped[date] = mapped_column(Date)
+    comentario: Mapped[str] = mapped_column(Text, default="")
+    supervisor: Mapped[str] = mapped_column(String(120), default="")
+    # app | telegram | importado
+    origen: Mapped[str] = mapped_column(String(20), default="app")
+    # Enlaces de evidencias del sistema anterior (Catbox / Freeimage).
+    urls_externas: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), default=list, server_default=text("'{}'::text[]"))
+
+    __table_args__ = (
+        Index("ix_expedientes_fecha", "fecha_incidencia"),
+        Index("ix_expedientes_colaborador", "colaborador"),
+        Index("ix_expedientes_area", "area"),
+    )
+
+
+class Archivo(Base):
+    """
+    Evidencias y documentos. Se guardan en la base y solo se entregan a un
+    usuario con sesión y permiso sobre el módulo (antes iban a Catbox, con
+    enlaces públicos que cualquiera podía abrir).
+    """
+
+    __tablename__ = "archivos"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # expediente | repositorio | calidad | ...
+    ambito: Mapped[str] = mapped_column(String(30))
+    # A qué pertenece dentro del ámbito: id del expediente, nombre del colaborador...
+    referencia: Mapped[str] = mapped_column(String(200))
+    nombre: Mapped[str] = mapped_column(String(255))
+    mime: Mapped[str] = mapped_column(String(120))
+    tamano: Mapped[int] = mapped_column(Integer)
+    descripcion: Mapped[str] = mapped_column(Text, default="")
+    subido_por: Mapped[str] = mapped_column(String(120), default="")
+    creado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    contenido: Mapped[bytes] = deferred(mapped_column(LargeBinary, nullable=False))
+
+    __table_args__ = (Index("ix_archivos_ambito_referencia", "ambito", "referencia"),)

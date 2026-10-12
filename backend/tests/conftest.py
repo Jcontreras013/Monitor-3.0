@@ -18,6 +18,7 @@ from alembic import command
 from app.config import get_settings, url_asyncpg
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
+TABLAS = ("ordenes", "usuarios", "estado_robot", "dispositivos_fttx", "personal", "expedientes", "archivos")
 
 
 @pytest.fixture(scope="session")
@@ -31,6 +32,8 @@ def url_bd() -> str:
     cfg.set_main_option("sqlalchemy.url", url)
     command.downgrade(cfg, "base")
     command.upgrade(cfg, "head")
+    # Falla si un modelo cambió y nadie generó la migración correspondiente.
+    command.check(cfg)
     return url
 
 
@@ -52,7 +55,7 @@ async def sesiones(entorno):
 
     engine = crear_engine(entorno.database_url)
     async with engine.begin() as conn:
-        await conn.execute(text("TRUNCATE ordenes, usuarios, estado_robot, dispositivos_fttx RESTART IDENTITY"))
+        await conn.execute(text(f"TRUNCATE {', '.join(TABLAS)} RESTART IDENTITY"))
     yield crear_sesiones(engine)
     await engine.dispose()
 
@@ -73,9 +76,9 @@ def crear_usuario(sesiones):
     from app.models import Usuario
     from app.security import cifrar_clave
 
-    async def _crear(usuario="javier", clave="clave-segura-1", rol="admin"):
+    async def _crear(usuario="javier", clave="clave-segura-1", rol="admin", **extra):
         async with sesiones() as s:
-            s.add(Usuario(usuario=usuario, nombre=usuario.title(), rol=rol, clave_hash=cifrar_clave(clave)))
+            s.add(Usuario(usuario=usuario, nombre=usuario.title(), rol=rol, clave_hash=cifrar_clave(clave), **extra))
             await s.commit()
 
     return _crear
