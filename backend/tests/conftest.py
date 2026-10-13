@@ -18,7 +18,8 @@ from alembic import command
 from app.config import get_settings, url_asyncpg
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
-TABLAS = ("ordenes", "usuarios", "estado_robot", "dispositivos_fttx", "personal", "expedientes", "archivos")
+TABLAS = ("ordenes", "usuarios", "estado_robot", "dispositivos_fttx", "personal", "expedientes", "archivos",
+          "calidad_gestiones", "auditorias_campo")
 
 
 @pytest.fixture(scope="session")

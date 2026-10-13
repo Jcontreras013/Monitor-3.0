@@ -8,20 +8,23 @@ from enum import StrEnum
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import undefer
 
 from app import archivos as arch
 from app import reportes
+from app.api.calidad import AuditoriaOut, auditorias_out, fibra_deficientes_pendientes
 from app.deps import SesionDB
 from app.deps import requiere as _requiere
 from app.dominio import expedientes as dom
 from app.dominio.fechas import ZONA_HN, ahora_hn
-from app.models import Archivo, Expediente, Personal, Usuario
+from app.dominio.nombres import normalizar_nombre_cruce
+from app.models import Archivo, AuditoriaCampo, Expediente, Personal, Usuario
 from app.permisos import es_admin
 from app.reportes import word
+from app.schemas import ArchivoOut
 
 router = APIRouter(prefix="/expedientes", tags=["expedientes"])
 
@@ -45,18 +48,6 @@ class TipoFiltro(StrEnum):
 # ------------------------------------------------------------------------------
 # Esquemas
 # ------------------------------------------------------------------------------
-class ArchivoOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: str
-    nombre: str
-    mime: str
-    tamano: int
-    descripcion: str = ""
-    subido_por: str = ""
-    creado_en: datetime
-
-
 class RegistroOut(BaseModel):
     id: int
     fecha_registro: datetime
@@ -108,6 +99,8 @@ class ListadoOut(BaseModel):
     resumen_mes: list[FilaMes]
     colaboradores: list[str]
     areas: list[str]
+    # Auditorías de fibra en campo del técnico filtrado (solo lectura).
+    auditorias_fibra: list[AuditoriaOut] = []
 
 
 class CatalogoOut(BaseModel):
@@ -130,11 +123,6 @@ class ConsolidadoOut(BaseModel):
 class CarpetaOut(BaseModel):
     colaborador: str
     archivos: list[ArchivoOut]
-
-
-def _archivo_out(a: Archivo) -> ArchivoOut:
-    return ArchivoOut(id=str(a.id), nombre=a.nombre, mime=a.mime, tamano=a.tamano, descripcion=a.descripcion,
-                      subido_por=a.subido_por, creado_en=a.creado_en)
 
 
 def _nombre_supervisor(usuario: Usuario) -> str:
@@ -256,13 +244,21 @@ async def listar(filtros: FiltrosDep, db: SesionDB, _: UsuarioExpedientes):
         select(Expediente.area).where(Expediente.area != dom.AREA_OPERACIONES).distinct().order_by(Expediente.area)
     )).all()
 
+    auditorias = []
+    if filtros.seccion is Seccion.operaciones and filtros.colaborador:
+        clave = normalizar_nombre_cruce(filtros.colaborador)
+        auditorias = [a for a in (await db.scalars(
+            select(AuditoriaCampo).where(AuditoriaCampo.tipo == "fibra").order_by(AuditoriaCampo.fecha_auditoria.desc())
+        )).all() if normalizar_nombre_cruce(a.tecnico) == clave]
+
     return ListadoOut(
+        auditorias_fibra=await auditorias_out(db, auditorias),
         registros=[
             RegistroOut(
                 id=r.id, fecha_registro=r.fecha_registro, fecha_incidencia=r.fecha_incidencia,
                 colaborador=r.colaborador, area=r.area, tipo_falta=r.tipo_falta, comentario=r.comentario,
                 supervisor=r.supervisor, origen=r.origen, clasificacion=c,
-                archivos=[_archivo_out(a) for a in adjuntos.get(str(r.id), [])], urls_externas=r.urls_externas,
+                archivos=[arch.a_salida(a) for a in adjuntos.get(str(r.id), [])], urls_externas=r.urls_externas,
             )
             for r, c in zip(registros, clasificacion, strict=True)
         ],
@@ -287,6 +283,7 @@ async def crear(
     fecha_incidencia: Annotated[date | None, Form()] = None,
     comentario: Annotated[str, Form()] = "",
     archivos: Annotated[list[UploadFile], File()] = [],  # noqa: B006
+    auditoria_id: Annotated[int | None, Form()] = None,
 ):
     opciones = dom.MOTIVOS_OPERACIONES if seccion is Seccion.operaciones else dom.MOTIVOS_ADMINISTRATIVO
     if motivo not in opciones:
@@ -319,6 +316,13 @@ async def crear(
     await db.flush()
     guardados = await arch.guardar(db, nuevos, ambito="expediente", referencia=str(registro.id),
                                    subido_por=usuario.usuario, permitidas=arch.EXT_EVIDENCIA)
+    if auditoria_id is not None:
+        # Falta registrada a partir de una auditoría de fibra deficiente: queda vinculada.
+        auditoria = await db.get(AuditoriaCampo, auditoria_id)
+        if auditoria is None or auditoria.tipo != "fibra":
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "La auditoría de fibra no existe")
+        auditoria.convertido_a_falta = True
+        auditoria.expediente_id = registro.id
     await db.commit()
     await db.refresh(registro)
     return RegistroOut(
@@ -326,8 +330,24 @@ async def crear(
         colaborador=registro.colaborador, area=registro.area, tipo_falta=registro.tipo_falta,
         comentario=registro.comentario, supervisor=registro.supervisor, origen=registro.origen,
         clasificacion=dom.clasificar_grave_o_leve(registro.tipo_falta, registro.comentario),
-        archivos=[_archivo_out(a) for a in guardados], urls_externas=[],
+        archivos=[arch.a_salida(a) for a in guardados], urls_externas=[],
     )
+
+
+@router.get("/auditorias-fibra", response_model=list[AuditoriaOut])
+async def auditorias_fibra_pendientes(db: SesionDB, _: UsuarioExpedientes):
+    """Auditorías de fibra "Deficiente / Mal trabajo" que aún no se registraron como falta."""
+    return await auditorias_out(db, await fibra_deficientes_pendientes(db))
+
+
+@router.post("/auditorias-fibra/{auditoria_id}/descartar", status_code=status.HTTP_204_NO_CONTENT)
+async def descartar_auditoria(auditoria_id: int, db: SesionDB, _: UsuarioExpedientes):
+    """Revisada y no amerita falta: deja de aparecer como pendiente."""
+    auditoria = await db.get(AuditoriaCampo, auditoria_id)
+    if auditoria is None or auditoria.tipo != "fibra":
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "La auditoría de fibra no existe")
+    auditoria.convertido_a_falta = True
+    await db.commit()
 
 
 @router.delete("/{registro_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -462,7 +482,7 @@ async def repositorio(db: SesionDB, _: UsuarioRepositorio):
     )).all()
     carpetas: dict[str, list[ArchivoOut]] = {}
     for a in filas:
-        carpetas.setdefault(a.referencia, []).append(_archivo_out(a))
+        carpetas.setdefault(a.referencia, []).append(arch.a_salida(a))
     return [CarpetaOut(colaborador=c, archivos=lista) for c, lista in carpetas.items()]
 
 
@@ -490,7 +510,7 @@ async def subir_al_repositorio(
                                    subido_por=usuario.usuario, permitidas=arch.EXT_DOCUMENTO,
                                    descripcion=descripcion.strip())
     await db.commit()
-    return [_archivo_out(a) for a in guardados]
+    return [arch.a_salida(a) for a in guardados]
 
 
 @router.delete("/repositorio/{archivo_id}", status_code=status.HTTP_204_NO_CONTENT)

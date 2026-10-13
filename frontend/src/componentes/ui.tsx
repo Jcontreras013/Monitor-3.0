@@ -13,6 +13,7 @@ export function Pestanas<T extends string>({
     <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 text-sm font-medium">
       {opciones.map((o) => (
         <button
+          type="button"
           key={o.valor}
           onClick={() => alCambiar(o.valor)}
           className={`-mb-px border-b-2 px-2 py-2 whitespace-nowrap sm:px-3 ${
@@ -42,6 +43,7 @@ export function Segmentado<T extends string>({
     <div className="flex gap-1 overflow-x-auto rounded-lg bg-slate-100 p-1" role="group" aria-label={etiqueta}>
       {opciones.map((o) => (
         <button
+          type="button"
           key={o.valor}
           aria-pressed={valor === o.valor}
           onClick={() => alCambiar(o.valor)}

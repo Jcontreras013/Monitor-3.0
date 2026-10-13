@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block titulo %}Cierres INSFIBRA y gestión de llamadas{% endblock %}
+{% block contenido %}
+  <h1>CIERRES INSFIBRA Y GESTIÓN DE LLAMADAS</h1>
+  <div class="sub">Cierres del {{ desde | fecha }} al {{ hasta | fecha }} · Generado el {{ generado | fecha_hora }}</div>
+  {% if not datos.total %}
+    <p class="vacio">No hay cierres de INSFIBRA en el rango seleccionado.</p>
+  {% else %}
+    <div class="kpis">
+      <div class="kpi"><div class="etq">INSFIBRA cerradas</div><div class="val">{{ datos.total }}</div></div>
+      <div class="kpi" style="border-left-color:#10b981"><div class="etq">Con llamada registrada</div><div class="val">{{ datos.llamadas }}</div></div>
+      <div class="kpi" style="border-left-color:#ef4444"><div class="etq">Pendientes de llamar</div><div class="val">{{ datos.pendientes }}</div></div>
+    </div>
+    <h2>Resumen por técnico</h2>
+    <table>
+      <thead><tr><th>Técnico</th><th class="centro">Cierres</th><th class="centro">Llamadas</th><th class="centro">Pendientes</th></tr></thead>
+      <tbody>{% for t in datos.por_tecnico %}
+        <tr><td>{{ t.tecnico }}</td><td class="centro">{{ t.cierres }}</td><td class="centro">{{ t.llamadas }}</td><td class="centro">{{ t.pendientes }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+    <h2>Listado detallado</h2>
+    <table>
+      <thead><tr><th>Orden</th><th>Cliente</th><th>Nombre</th><th>Técnico</th><th>Cierre</th><th class="centro">¿Se llamó?</th></tr></thead>
+      <tbody>{% for f in datos.filas %}
+        <tr><td>{{ f.num }}</td><td>{{ f.cliente or '' }}</td><td>{{ f.nombre or '' }}</td><td>{{ f.tecnico or '' }}</td>
+            <td>{{ f.fecha_cierre | fecha }}</td><td class="centro">{{ 'Sí' if f.llamada else 'Pendiente' }}</td></tr>
+      {% endfor %}</tbody>
+    </table>
+  {% endif %}
+{% endblock %}

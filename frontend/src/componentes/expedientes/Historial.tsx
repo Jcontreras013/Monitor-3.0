@@ -2,11 +2,12 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 
 import { api, consulta } from '../../api'
-import type { CatalogoExpedientes, ConsolidadoMes, ListadoExpedientes, RegistroExpediente } from '../../tipos'
+import type { AuditoriaCampo, CatalogoExpedientes, ConsolidadoMes, ListadoExpedientes, RegistroExpediente } from '../../tipos'
 import { COLOR_CLASIFICACION } from '../../estilos'
 import { Aviso, Barras, Dato, Descarga, Pestanas, Segmentado } from '../ui'
+import { AuditoriasDelTecnico, PendientesFibra } from './AuditoriasFibra'
 import DetalleRegistro from './DetalleRegistro'
-import FormularioFalta from './FormularioFalta'
+import FormularioFalta, { type FaltaInicial } from './FormularioFalta'
 
 type Tipo = 'todos' | 'llamado' | 'tarde' | 'ausencia' | 'medica'
 type Vista = 'registros' | 'analisis' | 'mes'
@@ -25,6 +26,21 @@ const haceDias = (dias: number) => {
   d.setDate(d.getDate() - dias)
   return d.toISOString().slice(0, 10)
 }
+const sinAcentos = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().trim()
+
+/** Falta prellenada a partir de una auditoría de fibra deficiente. */
+function desdeAuditoria(a: AuditoriaCampo, catalogo: CatalogoExpedientes | undefined): FaltaInicial {
+  // El técnico viene con el nombre de Cepheus: se busca su equivalente en el catálogo.
+  const colaborador = (catalogo?.personal.OPERACIONES ?? []).find((n) => sinAcentos(n) === sinAcentos(a.tecnico)) ?? ''
+  const fecha = new Date(a.fecha_auditoria).toLocaleDateString('es-HN', { timeZone: 'America/Tegucigalpa' })
+  return {
+    motivo: 'Trabajo Deficiente (Auditoría de Fibra)',
+    colaborador,
+    comentario: `[Auditoría de Fibra ORD-${a.num_orden}, ${fecha}] ${a.comentario}`.trim(),
+    auditoriaId: a.id,
+  }
+}
+
 const fechaCorta = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}/${iso.slice(0, 4)}`
 
 export default function Historial({
@@ -43,6 +59,7 @@ export default function Historial({
   const [tipo, setTipo] = useState<Tipo>('todos')
   const [vista, setVista] = useState<Vista>('registros')
   const [formulario, setFormulario] = useState(false)
+  const [inicial, setInicial] = useState<FaltaInicial | undefined>()
   const [detalle, setDetalle] = useState<RegistroExpediente | null>(null)
 
   const filtros = consulta({ seccion, area, colaborador, desde, hasta, tipo })
@@ -92,6 +109,9 @@ export default function Historial({
       </div>
 
       {listado.error && <Aviso tipo="error">No se pudo cargar el historial: {listado.error.message}</Aviso>}
+
+      {seccion === 'operaciones' && <PendientesFibra alRegistrar={(a) => { setInicial(desdeAuditoria(a, catalogo)); setFormulario(true) }} />}
+      {d && colaborador && <AuditoriasDelTecnico auditorias={d.auditorias_fibra} colaborador={colaborador} />}
 
       {d && (
         <section className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -169,7 +189,12 @@ export default function Historial({
       )}
 
       {formulario && catalogo && (
-        <FormularioFalta seccion={seccion} catalogo={catalogo} alCerrar={() => setFormulario(false)} />
+        <FormularioFalta
+          seccion={seccion}
+          catalogo={catalogo}
+          inicial={inicial}
+          alCerrar={() => { setFormulario(false); setInicial(undefined) }}
+        />
       )}
       {detalle && <DetalleRegistro registro={detalle} esAdmin={esAdmin} alCerrar={() => setDetalle(null)} />}
     </div>

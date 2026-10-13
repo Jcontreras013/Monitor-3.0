@@ -8,25 +8,30 @@ import Modal from '../Modal'
 const RECO = 'Reco / Cambio de Postes'
 const hoy = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Tegucigalpa' })
 
+export type FaltaInicial = { motivo: string; colaborador: string; comentario: string; auditoriaId: number }
+
 export default function FormularioFalta({
   seccion,
   catalogo,
   alCerrar,
+  inicial,
 }: {
   seccion: 'operaciones' | 'administrativo'
   catalogo: CatalogoExpedientes
   alCerrar: () => void
+  /** Datos de una auditoría de fibra deficiente que se está convirtiendo en falta. */
+  inicial?: FaltaInicial
 }) {
   const clienteQuery = useQueryClient()
   const motivos = seccion === 'operaciones' ? catalogo.motivos_operaciones : catalogo.motivos_administrativo
   const areas = Object.keys(catalogo.personal).filter((a) => a !== 'OPERACIONES').sort()
 
   const [area, setArea] = useState('')
-  const [motivo, setMotivo] = useState(motivos[0])
+  const [motivo, setMotivo] = useState(inicial?.motivo ?? motivos[0])
   const [motivoOtro, setMotivoOtro] = useState('')
-  const [colaborador, setColaborador] = useState('')
+  const [colaborador, setColaborador] = useState(inicial?.colaborador ?? '')
   const [fecha, setFecha] = useState(hoy())
-  const [comentario, setComentario] = useState('')
+  const [comentario, setComentario] = useState(inicial?.comentario ?? '')
   const [archivos, setArchivos] = useState<FileList | null>(null)
 
   const personas = seccion === 'operaciones' ? catalogo.personal.OPERACIONES ?? [] : catalogo.personal[area] ?? []
@@ -43,6 +48,7 @@ export default function FormularioFalta({
       datos.set('fecha_incidencia', fecha)
       datos.set('comentario', comentario)
       for (const archivo of Array.from(archivos ?? [])) datos.append('archivos', archivo)
+      if (inicial) datos.set('auditoria_id', String(inicial.auditoriaId))
       return enviarFormulario<RegistroExpediente>('/expedientes', datos)
     },
     onSuccess: () => {

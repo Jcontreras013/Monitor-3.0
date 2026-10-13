@@ -154,6 +154,7 @@ export type ListadoExpedientes = {
   resumen_mes: { colaborador: string; tardes: number; otras: number; total: number }[]
   colaboradores: string[]
   areas: string[]
+  auditorias_fibra: AuditoriaCampo[]
 }
 
 export type CatalogoExpedientes = {
@@ -165,3 +166,109 @@ export type CatalogoExpedientes = {
 export type ConsolidadoMes = { mes: string; total: number; filas: { colaborador: string; faltas: number }[] }
 
 export type CarpetaRepositorio = { colaborador: string; archivos: ArchivoMeta[] }
+
+// ---------------------------------------------------------------------------
+// Control de Calidad
+// ---------------------------------------------------------------------------
+export type OrdenCalidad = {
+  num: string
+  actividad: string
+  estado: string
+  cliente: string | null
+  nombre: string | null
+  colonia: string | null
+  tecnico: string | null
+  comentario: string | null
+  comentario_cierre: string | null
+  olt: string | null
+  hora_ini: string | null
+  hora_liq: string | null
+  tiempo_invertido_min: number | null
+}
+
+export type ConfigCalidad = {
+  pestanas: string[]
+  preguntas: { clave: string; texto: string; opcional: boolean }[]
+  aprobaciones: string[]
+  estados_sin_contestar: string[]
+  resultados_gestion: string[]
+  tipos_nota: string[]
+  esteticas: string[]
+  evaluaciones_fibra: string[]
+  puede_borrar: boolean
+}
+
+export type GestionCalidad = {
+  id: number
+  fecha_gestion: string
+  num_orden: string
+  cliente: string
+  nombre_cliente: string
+  tecnico: string
+  actividad: string
+  fecha_visita: string
+  contesto: boolean
+  p1: number | null
+  p2: number | null
+  p3: number | null
+  p4: number | null
+  p5: number | null
+  p6: number | null
+  p7: number | null
+  mejoras: string
+  aceptacion_digital: string
+  hora_cierre_servicio: string
+  aprobacion_interna: string
+  metodo_auditoria: string
+  resultado_gestion: string
+  ticket_seguimiento: string
+  responsable_seguimiento: string
+  fecha_limite_seguimiento: string | null
+  tipo_nota: string
+  detalle_nota: string
+  registrado_por: string
+  resultado: string
+  promedio: number | null
+}
+
+export type AuditoriaCampo = {
+  id: number
+  tipo: 'operaciones' | 'instalaciones' | 'fibra'
+  fecha_auditoria: string
+  num_orden: string
+  cliente: string
+  nombre_cliente: string
+  tecnico: string
+  actividad: string
+  vineta: string
+  mufa: string
+  metraje: string
+  estetica: string
+  ruta_acometida: string
+  tiempo_invertido: string
+  tipo_fo: string
+  comentario: string
+  evaluacion: string
+  supervisor: string
+  convertido_a_falta: boolean
+  expediente_id: number | null
+  urls_externas: string[]
+  archivos: ArchivoMeta[]
+}
+
+export type CierresInsfibra = {
+  total: number
+  llamadas: number
+  pendientes: number
+  filas: { num: string; cliente: string | null; nombre: string | null; tecnico: string | null; fecha_cierre: string | null; llamada: boolean }[]
+  por_tecnico: { tecnico: string; cierres: number; llamadas: number; pendientes: number }[]
+}
+
+export type HistoricoCalidad = {
+  gestiones: GestionCalidad[]
+  auditorias: AuditoriaCampo[]
+  csat: { csat: number | null; validas: number; top: number } | null
+  diagnostico: { pregunta: string; promedio: number; respuestas: number }[]
+  por_tecnico: { tecnico: string; total: number; aprobado: number; con_obs: number; rechazado: number; sin_gestion: number }[]
+  resumen: ({ nombre: string; cantidad: number } | { titulo: string; columna: string; filas: Conteo[] })[]
+}

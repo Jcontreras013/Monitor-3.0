@@ -10,6 +10,7 @@ export type Modulo = {
 // Cada módulo se carga solo cuando se abre, para que la primera carga sea liviana.
 export const MODULOS: Modulo[] = [
   { clave: 'monitor', titulo: 'Monitor', ruta: '/monitor', pantalla: lazy(() => import('./pantallas/Monitor')) },
+  { clave: 'calidad', titulo: 'Calidad', ruta: '/calidad', pantalla: lazy(() => import('./pantallas/Calidad')) },
   { clave: 'expedientes', titulo: 'Expedientes', ruta: '/expedientes', pantalla: lazy(() => import('./pantallas/Expedientes')) },
 ]
 

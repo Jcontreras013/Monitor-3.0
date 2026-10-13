@@ -15,6 +15,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Archivo
+from app.schemas import ArchivoOut
 
 TAMANO_MAXIMO = 15 * 1024 * 1024  # 15 MB por archivo
 
@@ -127,6 +128,11 @@ async def listar(sesion: AsyncSession, ambito: str, referencias: list[str]) -> d
     for archivo in filas:
         por_ref.setdefault(archivo.referencia, []).append(archivo)
     return por_ref
+
+
+def a_salida(a: Archivo) -> ArchivoOut:
+    return ArchivoOut(id=str(a.id), nombre=a.nombre, mime=a.mime, tamano=a.tamano, descripcion=a.descripcion,
+                      subido_por=a.subido_por, creado_en=a.creado_en)
 
 
 async def borrar_de(sesion: AsyncSession, ambito: str, referencia: str) -> None:

@@ -139,3 +139,15 @@ class EstadoRobotOut(BaseModel):
     duracion_seg: float | None
     minutos_desde_ultimo_ciclo: float | None = None
     atrasado: bool = False
+
+
+class ArchivoOut(BaseModel):
+    """Metadatos de un adjunto (el contenido se baja por /api/archivos/{id})."""
+
+    id: str
+    nombre: str
+    mime: str
+    tamano: int
+    descripcion: str = ""
+    subido_por: str = ""
+    creado_en: datetime

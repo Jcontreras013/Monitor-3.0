@@ -2,23 +2,9 @@ import io
 import zipfile
 from datetime import date
 
-from PIL import Image
-
 from app.dominio.fechas import ahora_hn
 from app.models import Personal
-
-
-def png() -> bytes:
-    salida = io.BytesIO()
-    Image.new("RGB", (40, 30), (200, 30, 30)).save(salida, format="PNG")
-    return salida.getvalue()
-
-
-async def entrar(cliente, crear_usuario, usuario="jefa", rol="jefe", **kw):
-    await crear_usuario(usuario=usuario, rol=rol, **kw)
-    r = await cliente.post("/api/auth/login", json={"usuario": usuario, "clave": "clave-segura-1"})
-    assert r.status_code == 200, r.text
-    return r.json()
+from tests.utiles import entrar, png
 
 
 async def crear(cliente, **datos):

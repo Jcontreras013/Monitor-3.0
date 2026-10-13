@@ -14,6 +14,7 @@ from sqlalchemy import (
     Boolean,
     Date,
     DateTime,
+    ForeignKey,
     Index,
     Integer,
     LargeBinary,
@@ -203,3 +204,88 @@ class Archivo(Base):
     contenido: Mapped[bytes] = deferred(mapped_column(LargeBinary, nullable=False))
 
     __table_args__ = (Index("ix_archivos_ambito_referencia", "ambito", "referencia"),)
+
+
+class GestionCalidad(Base):
+    """
+    Llamada de control de calidad post-servicio (antes la pestaña Calidad):
+    encuesta completa si el cliente contestó, o constancia de la gestión.
+    """
+
+    __tablename__ = "calidad_gestiones"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    fecha_gestion: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    num_orden: Mapped[str] = mapped_column(String(40))
+    cliente: Mapped[str] = mapped_column(String(40), default="")
+    nombre_cliente: Mapped[str] = mapped_column(Text, default="")
+    tecnico: Mapped[str] = mapped_column(String(160), default="")
+    actividad: Mapped[str] = mapped_column(String(60), default="")
+    fecha_visita: Mapped[str] = mapped_column(String(20), default="")
+    contesto: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Calificaciones 1-5 (NULL si no contestó; P4 también NULL si "No aplica").
+    p1: Mapped[int | None] = mapped_column(Integer)
+    p2: Mapped[int | None] = mapped_column(Integer)
+    p3: Mapped[int | None] = mapped_column(Integer)
+    p4: Mapped[int | None] = mapped_column(Integer)
+    p5: Mapped[int | None] = mapped_column(Integer)
+    p6: Mapped[int | None] = mapped_column(Integer)
+    p7: Mapped[int | None] = mapped_column(Integer)
+    mejoras: Mapped[str] = mapped_column(Text, default="")
+    aceptacion_digital: Mapped[str] = mapped_column(String(200), default="")
+    hora_cierre_servicio: Mapped[str] = mapped_column(String(20), default="")
+    aprobacion_interna: Mapped[str] = mapped_column(String(80), default="")
+    metodo_auditoria: Mapped[str] = mapped_column(String(160), default="")
+    resultado_gestion: Mapped[str] = mapped_column(String(80), default="")
+    ticket_seguimiento: Mapped[str] = mapped_column(String(80), default="")
+    responsable_seguimiento: Mapped[str] = mapped_column(String(120), default="")
+    fecha_limite_seguimiento: Mapped[date | None] = mapped_column(Date)
+    # Ninguna | Seguimiento | Promesa
+    tipo_nota: Mapped[str] = mapped_column(String(20), default="Ninguna")
+    detalle_nota: Mapped[str] = mapped_column(Text, default="")
+    registrado_por: Mapped[str] = mapped_column(String(120), default="")
+
+    __table_args__ = (
+        Index("ix_calidad_gestiones_orden", "num_orden"),
+        Index("ix_calidad_gestiones_fecha", "fecha_gestion"),
+    )
+
+
+class AuditoriaCampo(Base):
+    """
+    Auditoría presencial (antes las pestañas Operaciones, Instalaciones y
+    Auditoria_Fibra). Las fotos van en `archivos` (ámbito calidad).
+    """
+
+    __tablename__ = "auditorias_campo"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    # operaciones | instalaciones | fibra
+    tipo: Mapped[str] = mapped_column(String(20))
+    fecha_auditoria: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    num_orden: Mapped[str] = mapped_column(String(40))
+    cliente: Mapped[str] = mapped_column(String(40), default="")
+    nombre_cliente: Mapped[str] = mapped_column(Text, default="")
+    tecnico: Mapped[str] = mapped_column(String(160), default="")
+    actividad: Mapped[str] = mapped_column(String(60), default="")
+    vineta: Mapped[str] = mapped_column(String(60), default="")
+    mufa: Mapped[str] = mapped_column(String(60), default="")
+    metraje: Mapped[str] = mapped_column(String(40), default="")
+    estetica: Mapped[str] = mapped_column(String(30), default="")
+    ruta_acometida: Mapped[str] = mapped_column(Text, default="")
+    tiempo_invertido: Mapped[str] = mapped_column(String(40), default="")
+    tipo_fo: Mapped[str] = mapped_column(String(80), default="")
+    comentario: Mapped[str] = mapped_column(Text, default="")
+    # Correcto | Con observaciones | Deficiente / Mal trabajo (solo fibra)
+    evaluacion: Mapped[str] = mapped_column(String(40), default="")
+    supervisor: Mapped[str] = mapped_column(String(120), default="")
+    # Una auditoría de fibra deficiente se puede convertir en falta en Expedientes.
+    expediente_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("expedientes.id", ondelete="SET NULL"))
+    convertido_a_falta: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text("false"))
+    urls_externas: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), default=list, server_default=text("'{}'::text[]"))
+
+    __table_args__ = (
+        Index("ix_auditorias_campo_tipo_fecha", "tipo", "fecha_auditoria"),
+        Index("ix_auditorias_campo_tecnico", "tecnico"),
+    )

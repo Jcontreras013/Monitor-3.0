@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block titulo %}{{ titulo }}{% endblock %}
+{% block tamano %}letter landscape{% endblock %}
+{% block contenido %}
+  <h1>{{ titulo }}</h1>
+  <div class="sub">Del {{ desde | fecha }} al {{ hasta | fecha }} · Generado el {{ generado | fecha_hora }}</div>
+
+  {% if base == 'gestiones' %}
+    {% set g = datos.gestiones %}
+    {% if not g %}<p class="vacio">No hay gestiones de calidad en el rango seleccionado.</p>{% else %}
+    <h2>1. Indicadores clave</h2>
+    <div class="kpis">
+      <div class="kpi"><div class="etq">Gestiones registradas</div><div class="val">{{ g | length }}</div></div>
+      <div class="kpi" style="border-left-color:#10b981"><div class="etq">CSAT (P7: 4 o 5)</div>
+        <div class="val">{{ '%.0f%%' % datos.csat.csat if datos.csat.csat is not none else 'N/A' }}</div></div>
+      <div class="kpi"><div class="etq">Respuestas válidas</div><div class="val">{{ datos.csat.validas }}</div></div>
+      {% for r in datos.resumen %}<div class="kpi" style="border-left-color:#64748b"><div class="etq">{{ r.nombre }}</div><div class="val">{{ r.cantidad }}</div></div>{% endfor %}
+    </div>
+    <p class="nota">CSAT = clientes que calificaron 4 o 5 la satisfacción general (pregunta 7) ÷ respuestas válidas × 100. Solo cuentan las encuestas contestadas.</p>
+    {% if datos.diagnostico %}
+      <h2>2. Diagnóstico por pregunta (encuestas completas)</h2>
+      <table><thead><tr><th>Pregunta</th><th class="centro">Promedio (1-5)</th><th class="centro">Respuestas</th></tr></thead>
+        <tbody>{% for d in datos.diagnostico %}<tr><td>{{ d.pregunta }}</td><td class="centro">{{ '%.2f' % d.promedio }}</td><td class="centro">{{ d.respuestas }}</td></tr>{% endfor %}</tbody></table>
+    {% endif %}
+    <h2>3. Resumen por técnico</h2>
+    <table><thead><tr><th>Técnico</th><th class="centro">Total</th><th class="centro">Aprobado</th><th class="centro">Con obs.</th><th class="centro">Rechazado</th><th class="centro">Sin gestión</th></tr></thead>
+      <tbody>{% for t in datos.por_tecnico %}<tr><td>{{ t.tecnico }}</td><td class="centro">{{ t.total }}</td><td class="centro">{{ t.aprobado }}</td><td class="centro">{{ t.con_obs }}</td><td class="centro">{{ t.rechazado }}</td><td class="centro">{{ t.sin_gestion }}</td></tr>{% endfor %}</tbody></table>
+    <h2>4. Listado detallado</h2>
+    <table><thead><tr><th>Orden</th><th>Técnico</th><th>Cliente</th><th class="centro">P7</th><th class="centro">Prom.</th><th>Fecha</th><th>Resultado</th><th>Nota</th></tr></thead>
+      <tbody>{% for x in g %}<tr><td>{{ x.num_orden }}</td><td>{{ x.tecnico }}</td><td>{{ x.nombre_cliente }}</td>
+        <td class="centro">{{ x.p7 if x.p7 is not none else '—' }}</td><td class="centro">{{ '%.1f' % x.promedio if x.promedio is not none else '—' }}</td>
+        <td>{{ x.fecha_gestion | fecha_hora }}</td><td>{{ x.resultado }}</td><td>{{ x.detalle_nota }}</td></tr>{% endfor %}</tbody></table>
+    {% endif %}
+  {% else %}
+    {% set a = datos.auditorias %}
+    {% if not a %}<p class="vacio">No hay auditorías en el rango seleccionado.</p>{% else %}
+    <h2>1. Resumen de comprobaciones técnicas</h2>
+    <p>Total de auditorías de campo realizadas: <strong>{{ a | length }}</strong></p>
+    {% for r in datos.resumen %}
+      <h2>{{ loop.index + 1 }}. Resumen {{ r.titulo | lower }}</h2>
+      <table style="width:60%"><thead><tr><th>{{ r.columna }}</th><th class="centro">Cantidad</th></tr></thead>
+        <tbody>{% for f in r.filas %}<tr><td>{{ f.nombre }}</td><td class="centro">{{ f.cantidad }}</td></tr>{% endfor %}</tbody></table>
+    {% endfor %}
+    <h2>Listado detallado de comprobaciones</h2>
+    <table>
+      {% if base == 'operaciones' %}
+        <thead><tr><th>Orden</th><th>Cliente</th><th>Servicio</th><th>Viñeta</th><th>Mufa</th><th>Metraje</th><th>Estética</th><th>Ruta</th><th>Comentario</th><th>Supervisor</th></tr></thead>
+        <tbody>{% for x in a %}<tr><td>{{ x.num_orden }}</td><td>{{ x.cliente }}</td><td>{{ x.actividad }}</td><td>{{ x.vineta }}</td><td>{{ x.mufa }}</td><td>{{ x.metraje }}</td><td>{{ x.estetica }}</td><td>{{ x.ruta_acometida }}</td><td>{{ x.comentario }}</td><td>{{ x.supervisor }}</td></tr>{% endfor %}</tbody>
+      {% elif base == 'fibra' %}
+        <thead><tr><th>Orden</th><th>Cliente</th><th>Técnico</th><th>Ruta acometida</th><th>Metraje</th><th>Viñeta</th><th>Evaluación</th><th>Comentarios</th></tr></thead>
+        <tbody>{% for x in a %}<tr><td>{{ x.num_orden }}</td><td>{{ x.cliente }}</td><td>{{ x.tecnico }}</td><td>{{ x.ruta_acometida }}</td><td>{{ x.metraje }}</td><td>{{ x.vineta }}</td><td>{{ x.evaluacion }}</td><td>{{ x.comentario }}</td></tr>{% endfor %}</tbody>
+      {% else %}
+        <thead><tr><th>Orden</th><th>Cliente</th><th>Técnico</th><th>Tiempo</th><th>Tipo F.O.</th><th>Metros</th><th>Viñeta</th><th>Mufa</th><th>Comentario</th></tr></thead>
+        <tbody>{% for x in a %}<tr><td>{{ x.num_orden }}</td><td>{{ x.cliente }}</td><td>{{ x.tecnico }}</td><td>{{ x.tiempo_invertido }}</td><td>{{ x.tipo_fo }}</td><td>{{ x.metraje }}</td><td>{{ x.vineta }}</td><td>{{ x.mufa }}</td><td>{{ x.comentario }}</td></tr>{% endfor %}</tbody>
+      {% endif %}
+    </table>
+    {% endif %}
+  {% endif %}
+{% endblock %}
