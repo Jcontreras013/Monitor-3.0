@@ -13,7 +13,7 @@ from app.dominio import constantes as c
 from app.dominio import monitor as m
 from app.dominio.fechas import ahora_hn
 from app.dominio.normalizacion import tecnico_asignado
-from app.models import Orden
+from app.models import ClienteVip, Orden
 from app.schemas import OpcionesFiltro, OrdenOut, ResumenMonitor
 
 router = APIRouter(prefix="/monitor", tags=["monitor"])
@@ -93,6 +93,23 @@ async def ordenes(filtros: FiltrosDep, db: SesionDB, _: UsuarioMonitor, vista: V
             key=lambda o: (-m.dias_retraso(o, hoy), o.fecha_ape or datetime.max),
         )
     return [orden_out(o, ahora) for o in lista]
+
+
+class OrdenVip(OrdenOut):
+    nombre_vip: str
+    clase_vip: str
+
+
+@router.get("/vip", response_model=list[OrdenVip])
+async def ordenes_vip(db: SesionDB, _: UsuarioMonitor):
+    """Órdenes de clientes VIP sin atender (panel arriba del Monitor). La más nueva primero."""
+    ahora = ahora_hn()
+    filas = (await db.execute(
+        select(Orden, ClienteVip).join(ClienteVip, Orden.cliente == ClienteVip.cliente)
+        .where(Orden.vigente, Orden.es_viva, Orden.actividad.in_(c.ACTIVIDADES_PERMITIDAS))
+        .order_by(Orden.fecha_ape.desc().nulls_last())
+    )).all()
+    return [OrdenVip(**orden_out(o, ahora).model_dump(), nombre_vip=v.nombre, clase_vip=v.clase) for o, v in filas]
 
 
 @router.get("/filtros", response_model=OpcionesFiltro)

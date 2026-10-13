@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { api, parametros } from '../api'
 import BarraFiltros from '../componentes/BarraFiltros'
 import { AvanceSegmentos, Kpis, TableroCarga } from '../componentes/Indicadores'
+import PanelVip from '../componentes/PanelVip'
 import TablaOrdenes from '../componentes/TablaOrdenes'
 import { useEventosEnVivo } from '../useEventosEnVivo'
 import type { Filtros, OpcionesFiltro, Orden, ResumenMonitor } from '../tipos'
@@ -86,6 +87,8 @@ export default function Monitor() {
         conteos={r?.rapidos}
         alCambiar={setFiltros}
       />
+
+      <PanelVip />
 
       {resumen.error && (
         <p className="rounded-lg border border-red-300 bg-red-50 p-3 text-sm text-red-800">

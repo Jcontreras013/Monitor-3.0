@@ -4,14 +4,15 @@ de catálogo) a Postgres. Se puede repetir sin duplicar nada.
 
 1. En Google Sheets, abrir la base de datos y descargar cada pestaña como CSV
    (Archivo -> Descargar -> CSV): Sheet1, FTTX, Expedientes, Calidad,
-   Operaciones, Instalaciones, Auditoria_Fibra.
+   Operaciones, Instalaciones, Auditoria_Fibra, VIP.
 2. Correr, ANTES de arrancar el robot nuevo (cada opción es independiente):
 
     python -m scripts.importar_historial Sheet1.csv --fttx FTTX.csv \\
         --expedientes Expedientes.csv \\
         --personal-tecnico personal_tecnico.txt --personal-sac personal_sac.txt \\
         --calidad Calidad.csv --auditoria-operaciones Operaciones.csv \\
-        --auditoria-instalaciones Instalaciones.csv --auditoria-fibra Auditoria_Fibra.csv
+        --auditoria-instalaciones Instalaciones.csv --auditoria-fibra Auditoria_Fibra.csv \\
+        --vip VIP.csv
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ import csv
 import sys
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
 
 from app import repositorio
@@ -33,7 +34,8 @@ from app.dominio import expedientes as dom_exp
 from app.dominio.fechas import ZONA_HN, parse_fecha
 from app.dominio.normalizacion import normalizar_orden, texto_limpio
 from app.dominio.personal import leer_personal_administrativo, leer_personal_tecnico
-from app.models import AuditoriaCampo, DispositivoFttx, Expediente, GestionCalidad, Personal
+from app.dominio.vip import leer_archivo_vip
+from app.models import AuditoriaCampo, ClienteVip, DispositivoFttx, Expediente, GestionCalidad, Personal
 
 csv.field_size_limit(sys.maxsize)
 
@@ -247,6 +249,16 @@ async def importar_auditorias(sesiones, ruta: str, tipo: str) -> None:
     print(f"Auditorías {tipo}: {len(filas)} filas leídas, {len(nuevas)} nuevas, {descartadas} sin fecha u orden.")
 
 
+async def importar_vip(sesiones, ruta: str) -> None:
+    """Pestaña VIP: reemplaza la lista de clientes VIP."""
+    clientes = leer_archivo_vip(Path(ruta).read_bytes(), ruta)
+    async with sesiones() as sesion:
+        await sesion.execute(delete(ClienteVip))
+        sesion.add_all(ClienteVip(cliente=c.cliente, nombre=c.nombre, clase=c.clase[:60]) for c in clientes)
+        await sesion.commit()
+    print(f"Clientes VIP: {len(clientes)} cargados.")
+
+
 async def importar(args) -> None:
     engine = crear_engine(get_settings().database_url)
     sesiones = crear_sesiones(engine)
@@ -264,6 +276,8 @@ async def importar(args) -> None:
         for tipo in dom_cal.TIPOS_AUDITORIA:
             if ruta := getattr(args, f"auditoria_{tipo}"):
                 await importar_auditorias(sesiones, ruta, tipo)
+        if args.vip:
+            await importar_vip(sesiones, args.vip)
     finally:
         await engine.dispose()
 
@@ -279,9 +293,10 @@ def main() -> None:
     parser.add_argument("--auditoria-operaciones", help="CSV de la pestaña Operaciones")
     parser.add_argument("--auditoria-instalaciones", help="CSV de la pestaña Instalaciones")
     parser.add_argument("--auditoria-fibra", help="CSV de la pestaña Auditoria_Fibra")
+    parser.add_argument("--vip", help="CSV de la pestaña VIP (o el Excel de clientes VIP)")
     args = parser.parse_args()
     archivos = (args.ordenes, args.fttx, args.expedientes, args.personal_tecnico, args.personal_sac, args.calidad,
-                args.auditoria_operaciones, args.auditoria_instalaciones, args.auditoria_fibra)
+                args.auditoria_operaciones, args.auditoria_instalaciones, args.auditoria_fibra, args.vip)
     if not any(archivos):
         parser.error("indica al menos un archivo para importar")
     asyncio.run(importar(args))

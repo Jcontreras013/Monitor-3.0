@@ -56,10 +56,10 @@ Reescritura de [monitor-operativo](https://github.com/Jcontreras013/monitor-oper
 | 2 | Login, roles, Monitor en vivo (filtros rápidos con conteo, KPIs, pestañas de pendientes / cerradas / carga / avance, detalle de orden y CSV) | ✅ |
 | 3 | Expedientes (faltas, análisis, resumen del mes, repositorio, PDF y formulario oficial en Word) y Control de Calidad (llamadas, cierres INSFIBRA, auditorías de campo, histórico con CSAT y PDF; las auditorías de fibra deficientes pasan a Expedientes) | ✅ |
 | 4 | Reprogramadas / No instalados ✅ · Centro de Reportes (PDF/Excel), Gantt | En curso |
-| 5 | Bot de Telegram y alertas por correo (VIP, molex) | Pendiente |
-| 6 | Auditoría de vehículos, tiempos de técnicos, materiales, IA (`ia.py`), configuración | Pendiente |
+| 5 | Configuración (clientes VIP, correo de alertas), panel VIP en el Monitor y alertas del robot por correo (VIP nuevas, molex en cierres) ✅ · Bot de Telegram | En curso |
+| 6 | Auditoría de vehículos, tiempos de técnicos, materiales, IA (`ia.py`) | Pendiente |
 
-Del Monitor anterior todavía faltan: el Gantt, el panel de clientes VIP, las órdenes manuales, el filtro de técnicos contra el catálogo de técnicos principales y el PDF de órdenes totales (por ahora hay exportación a CSV).
+Del Monitor anterior todavía faltan: el Gantt, las órdenes manuales, el filtro de técnicos contra el catálogo de técnicos principales y el PDF de órdenes totales (por ahora hay exportación a CSV).
 
 ## Desarrollo local
 
@@ -99,13 +99,14 @@ Las pruebas de dominio corren sin base de datos. Las de API y robot usan un Post
 3. **Pasar los usuarios** del `secrets.toml` actual, con su contraseña y rol:
    `python -m scripts.usuarios importar ruta/.streamlit/secrets.toml`
    Las contraseñas que se cambiaron desde la app anterior (hoja `Usuarios_Claves`) no se pueden leer. A esos usuarios se les crea una nueva con `python -m scripts.usuarios crear USUARIO --rol ROL`.
-4. **Importar el historial**: descarga como CSV las pestañas de la base de datos de Google Sheets (`Sheet1`, `FTTX`, `Expedientes`, `Calidad`, `Operaciones`, `Instalaciones`, `Auditoria_Fibra`) y corre
+4. **Importar el historial**: descarga como CSV las pestañas de la base de datos de Google Sheets (`Sheet1`, `FTTX`, `Expedientes`, `Calidad`, `Operaciones`, `Instalaciones`, `Auditoria_Fibra`, `VIP`) y corre
    ```
    python -m scripts.importar_historial Sheet1.csv --fttx FTTX.csv \
        --expedientes Expedientes.csv \
        --personal-tecnico personal_tecnico.txt --personal-sac personal_sac.txt \
        --calidad Calidad.csv --auditoria-operaciones Operaciones.csv \
-       --auditoria-instalaciones Instalaciones.csv --auditoria-fibra Auditoria_Fibra.csv
+       --auditoria-instalaciones Instalaciones.csv --auditoria-fibra Auditoria_Fibra.csv \
+       --vip VIP.csv
    ```
    Cada opción es independiente. Hazlo **antes** de arrancar el robot nuevo. Se puede repetir sin duplicar nada. Las fotos viejas (Catbox/Drive) quedan como enlaces; las nuevas se guardan en la base de datos.
 5. **Instalar el robot** en la PC de MAXCOM (ver abajo). Durante la prueba en paralelo, ten en cuenta el límite de **5 consultas por hora** de Cepheus: dos robots cada 15 min suman 8. Lo recomendable es subir ambos a 25–30 min (`SYNC_INTERVALO_MINUTOS=30`) o apagar el viejo.
@@ -121,8 +122,9 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 git clone https://github.com/Jcontreras013/Monitor-3.0 C:\Maxcom\Monitor-3.0
 cd C:\Maxcom\Monitor-3.0\backend
 uv sync --no-dev
-copy .env.example .env    # DATABASE_URL (la misma de la API) y CEPHEUS_*
-# 3. Probar un ciclo
+copy .env.example .env    # DATABASE_URL (la misma de la API), CEPHEUS_* y CORREO_*
+# 3. Probar el correo de alertas y un ciclo
+uv run python -m worker.sync --probar-correo
 uv run python -m worker.sync --una-vez
 # 4. Dejarlo como servicio de Windows con NSSM (https://nssm.cc): arranca con
 #    Windows, sin ventana, y se reinicia solo si se cae (espera 5 min por el
@@ -135,7 +137,9 @@ nssm set MonitorRobot AppRestartDelay 300000
 nssm start MonitorRobot
 ```
 
-Para traer historial más viejo una sola vez: `uv run python -m worker.sync --backfill 60` (Cepheus no acepta más de ~60 días). El estado de cada ciclo queda en la tabla `estado_robot`, y la app avisa en el encabezado si el robot deja de reportar.
+Para traer historial más viejo una sola vez: `uv run python -m worker.sync --backfill 60` (Cepheus no acepta más de ~60 días; el backfill no manda alertas). El estado de cada ciclo queda en la tabla `estado_robot`, y la app avisa en el encabezado si el robot deja de reportar.
+
+Después de cada ciclo exitoso el robot manda las **alertas por correo** con las variables `CORREO_*` de su `.env`: órdenes nuevas de clientes VIP (abiertas en las últimas 24 h, a `CORREO_DESTINATARIOS_VIP`) y cierres de soporte cuyo comentario dice que se puso una molex nueva en medio del tramo (a `CORREO_DESTINATARIOS`). Cada orden se avisa una sola vez (tabla `alertas_enviadas`, antes los `.json` de la PC) y el resultado se ve en **Configuración → Correo de alertas**.
 
 ## Diferencias con el sistema anterior (a propósito)
 
@@ -148,6 +152,8 @@ Para traer historial más viejo una sola vez: `uv run python -m worker.sync --ba
 - **Contraseñas**: cualquier rol puede cambiar la suya (antes solo admin y jefe), con un mínimo de 8 caracteres.
 - **Archivos**: las evidencias de Expedientes y las fotos de auditorías se guardan en Postgres (se valida que sean imagen o PDF de verdad) en lugar de Catbox/Drive, que eran públicos.
 - **Permisos por módulo** en un solo lugar (`app/permisos.py`). El rol `llamados` solo ve Expedientes; las vistas de Calidad para `sac` y `miguel` se mantienen como antes.
+- **Correo**: se configura con variables de entorno `CORREO_*` en lugar de la sección `[correo]` de `secrets.toml`. La lista VIP vive en Postgres (antes la hoja `VIP`).
+- **Preferencias de interfaz y manual**: las casillas para ocultar secciones del Monitor ya no hacen falta (el Monitor nuevo va por pestañas) y el manual del sistema anterior describe pantallas que cambiaron; queda pendiente escribir uno nuevo.
 - **Envío de encuestas por WhatsApp (WATI)**: no se migró. Los envíos viejos se importan como gestiones "Sin Gestión".
 
 ## Estructura
@@ -164,7 +170,11 @@ backend/
       nombres.py        cruce difuso de nombres (para Expedientes y Telegram)
       expedientes.py    gravedad, reincidencias, resumen del mes
       calidad.py        encuesta, CSAT, resultado de la gestión, diagnóstico
-    api/              rutas: auth, monitor, reprogramadas, robot, eventos (SSE), archivos, expedientes, calidad
+      vip.py            lectura del Excel/CSV de clientes VIP
+      materiales.py     qué dice el comentario de cierre sobre las cajas molex
+    alertas.py        alertas por correo del robot (VIP nuevas, molex en cierres)
+    correo.py         envío SMTP (587/465)
+    api/              rutas: auth, monitor, reprogramadas, robot, eventos (SSE), archivos, expedientes, calidad, configuracion
     reportes/         PDF (HTML + WeasyPrint) y formulario oficial en Word
     models.py         tablas
     repositorio.py    upsert de órdenes, estado del robot
@@ -175,7 +185,7 @@ backend/
   tests/
 frontend/src/
   modulos.tsx         menú: qué módulos ve cada usuario (lo decide la API)
-  pantallas/          Monitor, Reprogramadas, Calidad, Expedientes
+  pantallas/          Monitor, Reprogramadas, Calidad, Expedientes, Configuracion
   componentes/        login, encabezado, filtros, indicadores, tabla de órdenes, calidad/, expedientes/
 Dockerfile            imagen única (API + frontend; el robot usa la misma)
 docker-compose.yml    Postgres + API (+ robot con --profile robot)

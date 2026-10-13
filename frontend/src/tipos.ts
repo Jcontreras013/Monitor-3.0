@@ -75,6 +75,23 @@ export type Orden = {
   dias_para_cita?: number
 }
 
+export type OrdenVip = Orden & { nombre_vip: string; clase_vip: string }
+
+export type ClienteVip = { cliente: string; nombre: string; clase: string }
+export type VistaPreviaVip = { clientes: ClienteVip[]; nuevos: number; salen: number }
+
+export type EstadoCorreo = {
+  servidor: string
+  puerto: number
+  modo: string
+  remitente: string
+  contrasena_configurada: boolean
+  destinatarios: string[]
+  destinatarios_vip: string[]
+  falta: string | null
+  alertas: { alerta: string; resultado: string; detalle: string; actualizado_en: string }[]
+}
+
 export type Reprogramadas = {
   reprogramadas: (Orden & { dias_para_cita: number })[]
   no_instalados: Orden[]

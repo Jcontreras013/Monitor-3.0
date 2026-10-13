@@ -10,6 +10,10 @@ Corre en una PC dentro de la red de MAXCOM (la única que alcanza Cepheus):
 En cada ciclo: consulta Cepheus, normaliza, hace upsert por número de orden,
 marca como no vigentes las vivas que ya no vinieron, avisa a los navegadores
 (NOTIFY) y deja el resultado en la tabla estado_robot, que la app muestra.
+Después de un ciclo exitoso corre las alertas por correo (clientes VIP y
+molex en cierres; ver app/alertas.py).
+
+    python -m worker.sync --probar-correo  # manda un correo de prueba y termina
 """
 
 from __future__ import annotations
@@ -25,7 +29,9 @@ import httpx
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import repositorio
+from app.alertas import procesar_alertas
 from app.config import Settings, get_settings
+from app.correo import ConfigCorreo, enviar_prueba
 from app.db import crear_engine, crear_sesiones
 from app.dominio.fechas import ahora_hn
 from app.dominio.normalizacion import normalizar_orden
@@ -97,7 +103,8 @@ async def registrar_estado(
         await sesion.commit()
 
 
-async def ciclo_protegido(sesiones, settings: Settings, dias_atras: int | None = None) -> ResultadoCiclo:
+async def ciclo_protegido(sesiones, settings: Settings, dias_atras: int | None = None,
+                          alertas: bool = True) -> ResultadoCiclo:
     """Un ciclo que nunca lanza excepción: cualquier falla queda registrada en estado_robot."""
     t0 = time.monotonic()
     try:
@@ -115,6 +122,12 @@ async def ciclo_protegido(sesiones, settings: Settings, dias_atras: int | None =
         await registrar_estado(sesiones, resultado, duracion)
     except Exception:
         log.exception("No se pudo guardar el estado del robot")
+    if resultado.ok and alertas:
+        try:
+            for alerta, estado, detalle in await procesar_alertas(sesiones, ConfigCorreo.desde(settings), ahora_hn()):
+                log.info("Alerta %s: %s — %s", alerta, estado, detalle)
+        except Exception:
+            log.exception("Falla en las alertas (la sincronización sí se completó)")
     return resultado
 
 
@@ -123,14 +136,23 @@ async def principal(argv: list[str] | None = None) -> int:
     parser.add_argument("--una-vez", action="store_true", help="corre un solo ciclo y termina")
     parser.add_argument("--backfill", type=int, metavar="DIAS",
                         help=f"trae hasta DIAS días atrás (máx. {DIAS_MAXIMOS_ATRAS}) una vez y termina")
+    parser.add_argument("--probar-correo", action="store_true", help="manda un correo de prueba y termina")
     args = parser.parse_args(argv)
 
     settings = get_settings()
+    if args.probar_correo:
+        config = ConfigCorreo.desde(settings)
+        ok, nota = enviar_prueba(config, origen="el robot de sincronización")
+        print(f"✅ Correo de prueba enviado a: {', '.join(config.destinatarios)}" if ok else "❌ No se pudo enviar")
+        if nota:
+            print(f"   {nota}")
+        return 0 if ok else 1
     engine = crear_engine(settings.database_url)
     sesiones = crear_sesiones(engine)
     try:
         if args.backfill or args.una_vez:
-            resultado = await ciclo_protegido(sesiones, settings, args.backfill)
+            # El backfill no avisa: traería de golpe cierres y órdenes viejas.
+            resultado = await ciclo_protegido(sesiones, settings, args.backfill, alertas=not args.backfill)
             return 0 if resultado.ok else 1
         log.info("Robot iniciado: un ciclo cada %s minutos", settings.sync_intervalo_minutos)
         while True:

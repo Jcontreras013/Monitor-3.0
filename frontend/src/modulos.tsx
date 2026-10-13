@@ -13,6 +13,7 @@ export const MODULOS: Modulo[] = [
   { clave: 'reprogramadas', titulo: 'Reprogramadas', ruta: '/reprogramadas', pantalla: lazy(() => import('./pantallas/Reprogramadas')) },
   { clave: 'calidad', titulo: 'Calidad', ruta: '/calidad', pantalla: lazy(() => import('./pantallas/Calidad')) },
   { clave: 'expedientes', titulo: 'Expedientes', ruta: '/expedientes', pantalla: lazy(() => import('./pantallas/Expedientes')) },
+  { clave: 'configuracion', titulo: 'Configuración', ruta: '/configuracion', pantalla: lazy(() => import('./pantallas/Configuracion')) },
 ]
 
 export const modulosDe = (claves: string[]) => MODULOS.filter((m) => claves.includes(m.clave))

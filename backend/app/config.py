@@ -54,16 +54,26 @@ class Settings(BaseSettings):
     sync_intervalo_minutos: int = 15
     sync_dias_atras: int = 55
 
+    # Correo de alertas (SMTP). 587 = STARTTLS, 465 = SSL/TLS.
+    correo_servidor: str = ""
+    correo_puerto: int = 587
+    correo_usuario: str = ""
+    correo_contrasena: str = ""
+    correo_remitente: str = ""
+    # Listas separadas por comas. Si no hay lista VIP propia, se usa la general.
+    correo_destinatarios: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    correo_destinatarios_vip: Annotated[list[str], NoDecode] = Field(default_factory=list)
+
     @field_validator("database_url")
     @classmethod
     def _normalizar_url(cls, v: str) -> str:
         return url_asyncpg(v)
 
-    @field_validator("cepheus_usuarios_consulta", mode="before")
+    @field_validator("cepheus_usuarios_consulta", "correo_destinatarios", "correo_destinatarios_vip", mode="before")
     @classmethod
-    def _lista_usuarios(cls, v):
+    def _lista_separada_por_comas(cls, v):
         if isinstance(v, str):
-            return [u.strip() for u in v.split(",") if u.strip()]
+            return [u.strip() for u in v.replace(";", ",").split(",") if u.strip()]
         return v
 
     @field_validator("cepheus_verificar_tls", mode="before")

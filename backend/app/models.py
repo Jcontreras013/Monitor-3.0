@@ -289,3 +289,37 @@ class AuditoriaCampo(Base):
         Index("ix_auditorias_campo_tipo_fecha", "tipo", "fecha_auditoria"),
         Index("ix_auditorias_campo_tecnico", "tecnico"),
     )
+
+
+class ClienteVip(Base):
+    """
+    Clientes VIP (antes la hoja VIP de Sheets). Solo código, nombre y clase:
+    los correos y teléfonos del Excel original no se guardan.
+    """
+
+    __tablename__ = "clientes_vip"
+
+    cliente: Mapped[str] = mapped_column(String(40), primary_key=True)
+    nombre: Mapped[str] = mapped_column(Text, default="")
+    clase: Mapped[str] = mapped_column(String(60), default="")
+
+
+class AlertaEnviada(Base):
+    """Órdenes ya avisadas por correo, para no repetir el aviso en cada ciclo del robot."""
+
+    __tablename__ = "alertas_enviadas"
+
+    alerta: Mapped[str] = mapped_column(String(20), primary_key=True)
+    num: Mapped[str] = mapped_column(String(40), primary_key=True)
+    enviada_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EstadoAlerta(Base):
+    """Resultado del último ciclo de cada alerta del robot (se ve en Configuración)."""
+
+    __tablename__ = "estado_alertas"
+
+    alerta: Mapped[str] = mapped_column(String(40), primary_key=True)
+    resultado: Mapped[str] = mapped_column(String(30), default="")
+    detalle: Mapped[str] = mapped_column(Text, default="")
+    actualizado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

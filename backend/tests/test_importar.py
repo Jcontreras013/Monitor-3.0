@@ -87,3 +87,15 @@ async def test_importa_auditorias_de_instalaciones(sesiones, tmp_path):
     async with sesiones() as s:
         a = await s.scalar(select(AuditoriaCampo))
     assert (a.tipo, a.metraje, a.actividad, a.comentario) == ("instalaciones", "60", "INSFIBRA", "Bien")
+
+
+async def test_importa_la_hoja_vip(sesiones, tmp_path):
+    from app.models import ClienteVip
+    from scripts.importar_historial import importar_vip
+
+    ruta = _csv(tmp_path / "VIP.csv", [{"CLIENTE": "200100", "NOMBRE": "Hotel", "CLASE": "A"},
+                                        {"CLIENTE": "200101.0", "NOMBRE": "Banco", "CLASE": ""}])
+    await importar_vip(sesiones, ruta)
+    await importar_vip(sesiones, ruta)
+    async with sesiones() as s:
+        assert sorted(c.cliente for c in (await s.scalars(select(ClienteVip))).all()) == ["200100", "200101"]

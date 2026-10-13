@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from app import repositorio
 from app.dominio.fechas import ahora_hn
 from app.dominio.normalizacion import normalizar_orden
+from app.models import EstadoAlerta
 
 
 async def entrar(cliente, usuario="javier", clave="clave-segura-1"):
@@ -154,3 +155,43 @@ async def test_reprogramadas_y_no_instalados(cliente, crear_usuario, sesiones):
     r = (await cliente.get("/api/reprogramadas")).json()
     assert [(o["num"], o["dias_para_cita"]) for o in r["reprogramadas"]] == [("10", 3)]
     assert [o["num"] for o in r["no_instalados"]] == ["12"]
+
+
+async def test_configuracion_vip_y_panel_del_monitor(cliente, crear_usuario, sesiones):
+    ahora = ahora_hn()
+    async with sesiones() as s:
+        await repositorio.guardar_ordenes(s, [normalizar_orden(
+            {"NUM": "20", "ACTIVIDAD": "SOPFIBRA", "ESTADO": "ASIGNADA", "TECNICO": "Ana", "CLIENTE": "200100",
+             "FECHA_APE": (ahora - timedelta(hours=2)).strftime("%Y-%m-%d %H:%M:%S")}, ahora)])
+        await s.commit()
+
+    await crear_usuario(usuario="mon", rol="monitoreo")
+    await entrar(cliente, usuario="mon")
+    assert (await cliente.get("/api/configuracion/vip")).status_code == 403
+    assert (await cliente.get("/api/monitor/vip")).json() == []
+
+    cliente.cookies.clear()
+    await crear_usuario(usuario="jefa", rol="jefe")
+    await entrar(cliente, usuario="jefa")
+    csv = b"CLIENTE,NOMBRE,CLASE\n200100,Hotel Palmira,Corporativo\n300,Otro,\n"
+    archivo = {"archivo": ("vip.csv", csv, "text/csv")}
+    previa = (await cliente.post("/api/configuracion/vip/vista-previa", files=archivo)).json()
+    assert (previa["nuevos"], previa["salen"], len(previa["clientes"])) == (2, 0, 2)
+    assert (await cliente.get("/api/configuracion/vip")).json() == []  # la vista previa no guarda
+
+    assert (await cliente.put("/api/configuracion/vip", json=previa["clientes"])).json() == {"total": 2}
+    assert [c["cliente"] for c in (await cliente.get("/api/configuracion/vip")).json()] == ["200100", "300"]
+    malo = await cliente.post("/api/configuracion/vip/vista-previa", files={"archivo": ("vip.xls", b"x", "x")})
+    assert malo.status_code == 400 and ".xlsx" in malo.json()["detail"]
+
+    panel = (await cliente.get("/api/monitor/vip")).json()
+    assert [(o["num"], o["nombre_vip"], o["clase_vip"]) for o in panel] == [("20", "Hotel Palmira", "Corporativo")]
+
+    async with sesiones() as s:
+        s.add(EstadoAlerta(alerta="Clientes VIP", resultado="enviado", detalle="1 orden(es): 20"))
+        await s.commit()
+    correo = (await cliente.get("/api/configuracion/correo")).json()
+    assert "CORREO_SERVIDOR" in correo["falta"] and correo["contrasena_configurada"] is False
+    assert [(a["alerta"], a["resultado"]) for a in correo["alertas"]] == [("Clientes VIP", "enviado")]
+    prueba = await cliente.post("/api/configuracion/correo/prueba")
+    assert prueba.status_code == 502 and "falta configurar" in prueba.json()["detail"]
