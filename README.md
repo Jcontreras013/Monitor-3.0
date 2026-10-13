@@ -54,7 +54,7 @@ Reescritura de [monitor-operativo](https://github.com/Jcontreras013/monitor-oper
 | 0 | Repositorio, PostgreSQL, migraciones, CI, Docker | ✅ |
 | 1 | Robot Cepheus → Postgres e importación del historial de Sheets | ✅ |
 | 2 | Login, roles, Monitor en vivo (filtros rápidos con conteo, KPIs, pestañas de pendientes / cerradas / carga / avance, detalle de orden y CSV) | ✅ |
-| 3 | Control de Calidad y Expedientes | Pendiente |
+| 3 | Expedientes (faltas, análisis, resumen del mes, repositorio, PDF y formulario oficial en Word) y Control de Calidad (llamadas, cierres INSFIBRA, auditorías de campo, histórico con CSAT y PDF; las auditorías de fibra deficientes pasan a Expedientes) | ✅ |
 | 4 | Centro de Reportes (PDF/Excel), Reprogramadas / No instalados, Gantt | Pendiente |
 | 5 | Bot de Telegram y alertas por correo (VIP, molex) | Pendiente |
 | 6 | Auditoría de vehículos, tiempos de técnicos, materiales, IA (`ia.py`), configuración | Pendiente |
@@ -99,9 +99,15 @@ Las pruebas de dominio corren sin base de datos. Las de API y robot usan un Post
 3. **Pasar los usuarios** del `secrets.toml` actual, con su contraseña y rol:
    `python -m scripts.usuarios importar ruta/.streamlit/secrets.toml`
    Las contraseñas que se cambiaron desde la app anterior (hoja `Usuarios_Claves`) no se pueden leer. A esos usuarios se les crea una nueva con `python -m scripts.usuarios crear USUARIO --rol ROL`.
-4. **Importar el historial**: descarga como CSV las pestañas `Sheet1` y `FTTX` de la base de datos de Google Sheets y corre
-   `python -m scripts.importar_historial Sheet1.csv --fttx FTTX.csv`
-   Hazlo **antes** de arrancar el robot nuevo. Se puede repetir sin duplicar nada.
+4. **Importar el historial**: descarga como CSV las pestañas de la base de datos de Google Sheets (`Sheet1`, `FTTX`, `Expedientes`, `Calidad`, `Operaciones`, `Instalaciones`, `Auditoria_Fibra`) y corre
+   ```
+   python -m scripts.importar_historial Sheet1.csv --fttx FTTX.csv \
+       --expedientes Expedientes.csv \
+       --personal-tecnico personal_tecnico.txt --personal-sac personal_sac.txt \
+       --calidad Calidad.csv --auditoria-operaciones Operaciones.csv \
+       --auditoria-instalaciones Instalaciones.csv --auditoria-fibra Auditoria_Fibra.csv
+   ```
+   Cada opción es independiente. Hazlo **antes** de arrancar el robot nuevo. Se puede repetir sin duplicar nada. Las fotos viejas (Catbox/Drive) quedan como enlaces; las nuevas se guardan en la base de datos.
 5. **Instalar el robot** en la PC de MAXCOM (ver abajo). Durante la prueba en paralelo, ten en cuenta el límite de **5 consultas por hora** de Cepheus: dos robots cada 15 min suman 8. Lo recomendable es subir ambos a 25–30 min (`SYNC_INTERVALO_MINUTOS=30`) o apagar el viejo.
 6. **Comparar** los indicadores del Monitor de ambos sistemas durante unos días. Las reglas se portaron sin cambios, así que deben coincidir, salvo por las correcciones descritas abajo.
 7. Apagar `sync_job.py` y la app de Streamlit cuando todos los módulos que se usen estén migrados.
@@ -140,6 +146,9 @@ Para traer historial más viejo una sola vez: `uv run python -m worker.sync --ba
 - **Ventana del Monitor**: se cargan las órdenes vivas y las abiertas o cerradas en los últimos 7 días. Ya no entran las órdenes viejas sin hora de liquidación, que solo afectaban el aviso de "estados no reconocidos".
 - **Filtros rápidos exclusivos**: Todas / Críticas / No asignadas son botones con su conteo y se elige uno a la vez. Antes eran dos interruptores que se podían combinar ("críticas sin técnico"). Actividad, estado, motivo y técnico sí se combinan con cualquiera de los tres.
 - **Contraseñas**: cualquier rol puede cambiar la suya (antes solo admin y jefe), con un mínimo de 8 caracteres.
+- **Archivos**: las evidencias de Expedientes y las fotos de auditorías se guardan en Postgres (se valida que sean imagen o PDF de verdad) en lugar de Catbox/Drive, que eran públicos.
+- **Permisos por módulo** en un solo lugar (`app/permisos.py`). El rol `llamados` solo ve Expedientes; las vistas de Calidad para `sac` y `miguel` se mantienen como antes.
+- **Envío de encuestas por WhatsApp (WATI)**: no se migró. Los envíos viejos se importan como gestiones "Sin Gestión".
 
 ## Estructura
 
@@ -153,7 +162,10 @@ backend/
       monitor.py        KPIs, tablero de carga, avance por segmento
       fechas.py         hora de Honduras, día operativo, formatos de Cepheus
       nombres.py        cruce difuso de nombres (para Expedientes y Telegram)
-    api/              rutas: auth, monitor, robot, eventos (SSE)
+      expedientes.py    gravedad, reincidencias, resumen del mes
+      calidad.py        encuesta, CSAT, resultado de la gestión, diagnóstico
+    api/              rutas: auth, monitor, robot, eventos (SSE), archivos, expedientes, calidad
+    reportes/         PDF (HTML + WeasyPrint) y formulario oficial en Word
     models.py         tablas
     repositorio.py    upsert de órdenes, estado del robot
     main.py           app FastAPI (+ sirve el frontend)
@@ -162,8 +174,9 @@ backend/
   alembic/            migraciones
   tests/
 frontend/src/
-  pantallas/Monitor.tsx
-  componentes/        login, encabezado, filtros, indicadores, tabla de órdenes
+  modulos.tsx         menú: qué módulos ve cada usuario (lo decide la API)
+  pantallas/          Monitor, Calidad, Expedientes
+  componentes/        login, encabezado, filtros, indicadores, tabla de órdenes, calidad/, expedientes/
 Dockerfile            imagen única (API + frontend; el robot usa la misma)
 docker-compose.yml    Postgres + API (+ robot con --profile robot)
 ```
