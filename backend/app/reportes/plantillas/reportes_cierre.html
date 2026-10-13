@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% from "_macros.html" import dona, tabla_conteo, barra %}
+{% block titulo %}Cierre diario {{ fecha | fecha }}{% endblock %}
+{% block estilos %}
+  .donas { display: flex; justify-content: space-around; margin: 6px 0 4px; }
+  .dona { text-align: center; }
+  .dona .etq { font-weight: bold; font-size: 8pt; }
+  .cuatro { display: flex; gap: 8px; align-items: flex-start; }
+  .cuatro > div { flex: 1; min-width: 0; }
+  table.mini td, table.mini th { font-size: 7.5pt; }
+  tr.total td { font-weight: bold; background: #eef0f6 !important; }
+  td.v { background: #92d050 !important; } td.a { background: #ffe699 !important; }
+  td.n { background: #f4b084 !important; } td.r { background: #ea9999 !important; }
+  .barra { height: 9px; background: #e5e7eb; border-radius: 3px; overflow: hidden; }
+  .barra > div { height: 100%; }
+{% endblock %}
+{% block contenido %}
+  <h1>Reporte analítico de cierre diario</h1>
+  <div class="sub">Jornada del {{ fecha | fecha }} · Generado el {{ generado | fecha_hora }}</div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="etq">Órdenes cerradas</div><div class="val">{{ total_cerradas }}</div></div>
+    <div class="kpi" style="border-left-color:#10b981"><div class="etq">Técnicos con cierres</div><div class="val">{{ eficiencia | length }}</div></div>
+    <div class="kpi" style="border-left-color:#f59e0b"><div class="etq">Primera orden más temprana</div>
+      <div class="val">{{ primera_orden[0].hora_ini.strftime('%H:%M') if primera_orden else '—' }}</div></div>
+  </div>
+
+  {% if not total_cerradas %}
+    <p class="vacio">No hay órdenes cerradas en esta jornada.</p>
+  {% else %}
+  <h2>1. Avance operativo (completado vs pendiente)</h2>
+  <div class="donas">
+    {% for a in avance %}
+      {{ dona(a.porcentaje, {'RESIDENCIAL': 'Residencial', 'PLEX': 'PLEX', 'GLOBAL': 'Global'}[a.segmento], a.total,
+              a.cerradas ~ ' de ' ~ a.total ~ ' · mora ' ~ ('%.0f' % a.mora_porcentaje) ~ '%') }}
+    {% endfor %}
+  </div>
+  <p class="nota">Cerradas de la jornada ÷ (cerradas + pendientes asignadas actuales). "Mora" es el mismo cálculo solo con órdenes abiertas antes del día.</p>
+
+  <h2>2. Eficiencia (puntos por meta + 10 % de bono por ruta mixta)</h2>
+  <table>
+    <thead><tr><th>Técnico</th><th class="centro">INS</th><th class="centro">SOP</th><th class="centro">OTR</th><th class="centro">Puntos base</th><th class="centro">Bono mixto</th><th class="centro">% Logro final</th></tr></thead>
+    <tbody>{% for t in eficiencia %}<tr><td>{{ t.tecnico }}</td><td class="centro">{{ t.ins }}</td><td class="centro">{{ t.sop }}</td><td class="centro">{{ t.otr }}</td>
+      <td class="centro">{{ '%.1f' % t.puntos_base }}%</td><td class="centro">+{{ '%.1f' % t.bono_mixto }}%</td><td class="centro"><strong>{{ '%.1f' % t.logro_final }}%</strong></td></tr>{% endfor %}</tbody>
+  </table>
+  <p class="nota">PEXTERNO = 100 %; instalación nueva / PLEX = 25 %; adición, cambio, recuperado, soporte y demás = 12,5 %.</p>
+
+  <h2>3. Desglose de producción</h2>
+  <div class="cuatro">
+    <div>{{ tabla_conteo('Soporte', produccion.sop) }}</div>
+    <div>{{ tabla_conteo('Instalaciones', produccion.instalaciones) }}</div>
+    <div>{{ tabla_conteo('PLEX', produccion.plex) }}</div>
+    <div>{{ tabla_conteo('Otros', produccion.otros) }}</div>
+  </div>
+
+  <h2 class="salto">4. Tiempos de atención (antigüedad de las órdenes liquidadas)</h2>
+  {% for titulo, t in [('Instalaciones liquidadas por rango', rangos_instalaciones), ('Mantenimientos liquidados por rango', rangos_mantenimientos)] %}
+    <p><strong>{{ titulo }}</strong></p>
+    {% if not t.ciudades %}<p class="nota">Sin datos.</p>{% else %}
+    <table>
+      <thead><tr><th>Días entre apertura y cierre</th>{% for ci in t.ciudades %}<th class="centro" colspan="2">{{ ci }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for f in t.filas %}<tr><td>{{ f.rango }}</td>
+          {% for x in f.celdas %}
+            {% set clase = '' if not x.cantidad else ('v' if x.porcentaje >= 75 else ('a' if x.porcentaje >= 40 else ('n' if x.porcentaje >= 25 else 'r'))) %}
+            <td class="centro">{{ x.cantidad or '' }}</td><td class="centro {{ clase }}">{{ (x.porcentaje ~ '%') if x.cantidad else '' }}</td>
+          {% endfor %}</tr>{% endfor %}
+        <tr class="total"><td>Total</td>{% for n in t.totales %}<td class="centro">{{ n }}</td><td class="centro">100%</td>{% endfor %}</tr>
+      </tbody>
+    </table>
+    {% endif %}
+  {% endfor %}
+
+  <h2>5. Órdenes cerradas y tiempo promedio de atención por ciudad</h2>
+  <table>
+    <thead><tr><th>Ciudad</th><th>Tipo de actividad</th><th class="centro">Cantidad</th><th class="centro">Minutos promedio</th></tr></thead>
+    <tbody>
+      {% for ci in por_ciudad %}
+        {% for f in ci.filas %}<tr><td>{{ ci.ciudad if loop.first else '' }}</td><td>{{ f.tipo }}</td><td class="centro">{{ f.cantidad }}</td><td class="centro">{{ f.minutos }}</td></tr>{% endfor %}
+        <tr class="total"><td></td><td>Total {{ ci.ciudad }}</td><td class="centro">{{ ci.cantidad }}</td><td class="centro">{{ ci.minutos }}</td></tr>
+      {% endfor %}
+      <tr class="total"><td colspan="2">Total general</td><td class="centro">{{ por_ciudad | sum(attribute='cantidad') }}</td><td></td></tr>
+    </tbody>
+  </table>
+
+  <h2>6. Resumen por tipo de actividad</h2>
+  <table style="width:70%">
+    <thead><tr><th>Actividad realizada</th><th class="centro">Total de órdenes</th></tr></thead>
+    <tbody>{% for f in por_actividad %}<tr><td>{{ f.nombre }}</td><td class="centro">{{ f.cantidad }}</td></tr>{% endfor %}
+      <tr class="total"><td style="text-align:right">TOTAL GENERAL</td><td class="centro">{{ total_cerradas }}</td></tr></tbody>
+  </table>
+
+  <h2>7. Distribución de la jornada</h2>
+  <table style="width:70%">
+    <tbody>{% for d in distribucion %}<tr><td style="width:30%">{{ d.nombre }}</td><td>{{ barra(d.porcentaje, '#5c82a6') }}</td><td class="centro" style="width:18%">{{ d.cantidad }} ({{ d.porcentaje }}%)</td></tr>{% endfor %}</tbody>
+  </table>
+
+  <h2 class="salto">8. Tiempos de atención promedio por colaborador y actividad</h2>
+  <table>
+    <thead><tr><th>Colaborador</th><th>Actividad</th><th class="centro">Órdenes atendidas</th><th class="centro">Prom. duración (min)</th></tr></thead>
+    <tbody>
+      {% for t in por_tecnico %}
+        {% for f in t.filas %}<tr><td>{{ t.tecnico if loop.first else '' }}</td><td>{{ f.actividad }}</td><td class="centro">{{ f.cantidad }}</td><td class="centro">{{ f.minutos }}</td></tr>{% endfor %}
+        <tr class="total"><td></td><td style="text-align:right">Total</td><td class="centro">{{ t.cantidad }}</td><td class="centro">{{ t.minutos }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <h2>9. Consolidado general de órdenes liquidadas</h2>
+  <table>
+    <thead><tr><th>Orden</th><th>Técnico</th><th>Actividad</th><th>Cierre</th><th class="centro">Tiempo</th></tr></thead>
+    <tbody>{% for o in cerradas %}<tr><td>{{ o.num }}</td><td>{{ o.tecnico }}</td><td>{{ o.actividad }}</td><td>{{ o.hora_liq | fecha_hora }}</td>
+      <td class="centro">{% set mi = minutos[o.num] %}{{ ('%dh %02dm' % (mi // 60, mi % 60)) if mi is not none else '—' }}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% endif %}
+{% endblock %}

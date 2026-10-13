@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block titulo %}Primera orden del día {{ fecha | fecha }}{% endblock %}
+{% block contenido %}
+  <h1>Reporte: primera orden del día</h1>
+  <div class="sub">{{ fecha | fecha }} · Generado el {{ generado | fecha_hora }}</div>
+  <table>
+    <thead><tr><th>Técnico</th><th class="centro">Hora de inicio</th><th>Colonia</th><th>Orden</th><th>Actividad</th></tr></thead>
+    <tbody>
+      {% for f in filas %}<tr><td>{{ f.tecnico }}</td><td class="centro">{{ f.hora_ini.strftime('%H:%M:%S') }}</td><td>{{ f.colonia or '' }}</td><td>{{ f.num }}</td><td>{{ f.actividad }}</td></tr>
+      {% else %}<tr><td colspan="5" class="vacio">No hay registros de primera orden para esta fecha.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

@@ -55,7 +55,7 @@ Reescritura de [monitor-operativo](https://github.com/Jcontreras013/monitor-oper
 | 1 | Robot Cepheus → Postgres e importación del historial de Sheets | ✅ |
 | 2 | Login, roles, Monitor en vivo (filtros rápidos con conteo, KPIs, pestañas de pendientes / cerradas / carga / avance, detalle de orden y CSV) | ✅ |
 | 3 | Expedientes (faltas, análisis, resumen del mes, repositorio, PDF y formulario oficial en Word) y Control de Calidad (llamadas, cierres INSFIBRA, auditorías de campo, histórico con CSAT y PDF; las auditorías de fibra deficientes pasan a Expedientes) | ✅ |
-| 4 | Reprogramadas / No instalados ✅ · Centro de Reportes (PDF/Excel), Gantt | En curso |
+| 4 | Reprogramadas / No instalados ✅ · Centro de Reportes: cierre diario, pendientes para Dispatch y arranque de jornada (PDF/Excel) ✅ · análisis de red OLT/PON, diagnóstico offline, análisis cruzado, Gantt | En curso |
 | 5 | Configuración (clientes VIP, correo de alertas), panel VIP en el Monitor y alertas del robot por correo (VIP nuevas, molex en cierres) ✅ · Bot de Telegram | En curso |
 | 6 | Auditoría de vehículos, tiempos de técnicos, materiales, IA (`ia.py`) | Pendiente |
 
@@ -152,6 +152,7 @@ Después de cada ciclo exitoso el robot manda las **alertas por correo** con las
 - **Contraseñas**: cualquier rol puede cambiar la suya (antes solo admin y jefe), con un mínimo de 8 caracteres.
 - **Archivos**: las evidencias de Expedientes y las fotos de auditorías se guardan en Postgres (se valida que sean imagen o PDF de verdad) en lugar de Catbox/Drive, que eran públicos.
 - **Permisos por módulo** en un solo lugar (`app/permisos.py`). El rol `llamados` solo ve Expedientes; las vistas de Calidad para `sac` y `miguel` se mantienen como antes.
+- **Cierre diario**: el día de un cierre es siempre el día operativo (HORA_LIQ − 6 h), igual que "Cerradas hoy" del Monitor; antes el PDF no restaba las 6 h y la pantalla sí, así que no siempre coincidían. La antigüedad de una orden liquidada son los días entre apertura y cierre (antes, los días de retraso de la última vez que el robot la vio).
 - **Correo**: se configura con variables de entorno `CORREO_*` en lugar de la sección `[correo]` de `secrets.toml`. La lista VIP vive en Postgres (antes la hoja `VIP`).
 - **Preferencias de interfaz y manual**: las casillas para ocultar secciones del Monitor ya no hacen falta (el Monitor nuevo va por pestañas) y el manual del sistema anterior describe pantallas que cambiaron; queda pendiente escribir uno nuevo.
 - **Envío de encuestas por WhatsApp (WATI)**: no se migró. Los envíos viejos se importan como gestiones "Sin Gestión".
@@ -172,10 +173,11 @@ backend/
       calidad.py        encuesta, CSAT, resultado de la gestión, diagnóstico
       vip.py            lectura del Excel/CSV de clientes VIP
       materiales.py     qué dice el comentario de cierre sobre las cajas molex
+      reportes.py       cierre diario, eficiencia, primera orden, arranque, pendientes para Dispatch
     alertas.py        alertas por correo del robot (VIP nuevas, molex en cierres)
     correo.py         envío SMTP (587/465)
-    api/              rutas: auth, monitor, reprogramadas, robot, eventos (SSE), archivos, expedientes, calidad, configuracion
-    reportes/         PDF (HTML + WeasyPrint) y formulario oficial en Word
+    api/              rutas: auth, monitor, reportes, reprogramadas, robot, eventos (SSE), archivos, expedientes, calidad, configuracion
+    reportes/         PDF (HTML + WeasyPrint), Excel y formulario oficial en Word
     models.py         tablas
     repositorio.py    upsert de órdenes, estado del robot
     main.py           app FastAPI (+ sirve el frontend)
@@ -185,7 +187,7 @@ backend/
   tests/
 frontend/src/
   modulos.tsx         menú: qué módulos ve cada usuario (lo decide la API)
-  pantallas/          Monitor, Reprogramadas, Calidad, Expedientes, Configuracion
+  pantallas/          Monitor, Reportes, Reprogramadas, Calidad, Expedientes, Configuracion
   componentes/        login, encabezado, filtros, indicadores, tabla de órdenes, calidad/, expedientes/
 Dockerfile            imagen única (API + frontend; el robot usa la misma)
 docker-compose.yml    Postgres + API (+ robot con --profile robot)

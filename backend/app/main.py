@@ -8,7 +8,18 @@ from fastapi import APIRouter, FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from sqlalchemy import text
 
-from app.api import archivos, auth, calidad, configuracion, eventos, expedientes, monitor, reprogramadas, robot
+from app.api import (
+    archivos,
+    auth,
+    calidad,
+    configuracion,
+    eventos,
+    expedientes,
+    monitor,
+    reportes,
+    reprogramadas,
+    robot,
+)
 from app.config import get_settings, url_libpq
 from app.db import crear_engine, crear_sesiones
 from app.eventos import Notificador
@@ -44,6 +55,7 @@ def crear_app() -> FastAPI:
     api.include_router(calidad.router)
     api.include_router(reprogramadas.router)
     api.include_router(configuracion.router)
+    api.include_router(reportes.router)
 
     @api.get("/salud", tags=["salud"])
     async def salud():

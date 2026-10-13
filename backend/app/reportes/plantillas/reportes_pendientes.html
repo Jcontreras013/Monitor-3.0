@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% from "_macros.html" import tabla_conteo %}
+{% block titulo %}Pendientes para Dispatch{% endblock %}
+{% block estilos %}
+  @page ancho { size: letter landscape; }
+  .ancho { page: ancho; }
+  .fila { display: flex; gap: 10px; align-items: flex-start; }
+  .fila > .crece { flex: 1; }
+  table.mini td, table.mini th { font-size: 7.5pt; }
+  tr.total td { font-weight: bold; background: #dce6f5 !important; }
+  /* !important: el sombreado de filas pares de base.html no debe tapar el color de los días. */
+  .d7 { background: #d32f2f !important; color: #fff; } .d4 { background: #f57c00 !important; color: #fff; }
+  .d1 { background: #fbc02d !important; } .d0 { background: #388e3c !important; color: #fff; }
+  .ancho td { font-size: 6.8pt; padding: 2px 3px; }
+  .ancho th { font-size: 6.5pt; padding: 3px; }
+{% endblock %}
+{% macro clase_dias(d) %}{{ 'd7' if d >= 7 else ('d4' if d >= 4 else ('d1' if d >= 1 else 'd0')) }}{% endmacro %}
+{% block contenido %}
+  <h1>Reporte de pendientes generales (Dispatch)</h1>
+  <div class="sub">Corte operativo del {{ ahora | fecha_hora }}</div>
+
+  <div class="fila">
+    <table style="width:28%">
+      <thead><tr><th>Días</th><th class="centro">Cant.</th></tr></thead>
+      <tbody>{% for cub in cubetas %}<tr><td class="{{ ['d7', 'd4', 'd1', 'd0'][loop.index0] }}">{{ cub.nombre }}</td><td class="centro">{{ cub.cantidad }}</td></tr>{% endfor %}</tbody>
+    </table>
+    <div class="crece">
+      <strong>Resumen de carga para el siguiente turno</strong>
+      <table>
+        <thead><tr><th>Clasificación</th><th class="centro">Asignadas</th><th class="centro">Sin asignar</th><th class="centro">Total</th></tr></thead>
+        <tbody>
+          {% for r in resumen %}<tr><td>{{ r.categoria }}</td><td class="centro">{{ r.asignadas }}</td><td class="centro">{{ r.sin_asignar }}</td><td class="centro">{{ r.total }}</td></tr>{% endfor %}
+          <tr class="total"><td>TOTAL PENDIENTES</td><td class="centro">{{ totales.asignadas }}</td><td class="centro">{{ totales.sin_asignar }}</td><td class="centro">{{ totales.total }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="fila">
+    <div class="crece">{{ tabla_conteo('FTTH / Fibra', instalaciones) }}</div>
+    <div class="crece">{{ tabla_conteo('Soporte (SOPFIBRA)', soporte) }}</div>
+    <div class="crece">{{ tabla_conteo('Resto de actividades', resto) }}</div>
+  </div>
+
+  <h2>Listado prioritario: órdenes nuevas sin asignar</h2>
+  {% set sin_asignar = ordenes | selectattr(2, 'false') | list %}
+  {% if sin_asignar %}
+  <table>
+    <thead><tr><th>Orden</th><th>Cliente</th><th>Actividad</th><th>Colonia</th><th class="centro">Días</th></tr></thead>
+    <tbody>{% for o, d, _ in sin_asignar %}<tr><td>{{ o.num }}</td><td>{{ o.cliente or '' }}</td><td>{{ o.actividad }}</td><td>{{ o.colonia or '' }}</td><td class="centro {{ clase_dias(d) }}">{{ d }}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% else %}<p style="color:#166534">Excelente: todas las órdenes están asignadas a técnicos.</p>{% endif %}
+
+  {% if ordenes %}
+  <div class="ancho salto">
+    <h2>Listado general detallado: todas las órdenes pendientes</h2>
+    <table>
+      <thead><tr><th class="centro">Días</th><th>Orden</th><th>Actividad</th><th>Motivo</th><th>Ciudad</th><th>Colonia</th><th>Cliente</th><th>Nombre del cliente</th><th>Técnico</th><th>Estado</th></tr></thead>
+      <tbody>{% for o, d, asignada in ordenes %}<tr><td class="centro {{ clase_dias(d) }}">{{ d }}</td><td>{{ o.num }}</td><td>{{ o.actividad }}</td><td>{{ o.motivo }}</td>
+        <td>{{ o.sector or '' }}</td><td>{{ o.colonia or '' }}</td><td>{{ o.cliente or '' }}</td><td>{{ o.nombre or '' }}</td><td>{{ o.tecnico if asignada else 'SIN ASIGNAR' }}</td><td>{{ o.estado }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  {% endif %}
+{% endblock %}

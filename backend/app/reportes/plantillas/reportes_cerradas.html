@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% from "_macros.html" import hora %}
+{% block titulo %}Órdenes cerradas {{ fecha | fecha }}{% endblock %}
+{% block contenido %}
+  <h1>Reporte de órdenes cerradas (detalle)</h1>
+  <div class="sub">Cierres de la jornada del {{ fecha | fecha }} · {{ cerradas | length }} órdenes · Generado el {{ generado | fecha_hora }}</div>
+  <table>
+    <thead><tr><th class="centro">H. inicio</th><th class="centro">H. cierre</th><th>Orden</th><th>Cliente</th><th>Técnico</th><th>Actividad</th><th>Colonia</th></tr></thead>
+    <tbody>
+      {% for o in cerradas %}<tr><td class="centro">{{ hora(o.hora_ini) }}</td><td class="centro">{{ hora(o.hora_liq) }}</td><td>{{ o.num }}</td><td>{{ o.cliente or '' }}</td>
+        <td>{{ o.tecnico or 'SIN ASIGNAR' }}</td><td>{{ o.actividad }}</td><td>{{ o.colonia or '' }}</td></tr>
+      {% else %}<tr><td colspan="7" class="vacio">No hay órdenes cerradas en esta jornada.</td></tr>{% endfor %}
+    </tbody>
+  </table>
+{% endblock %}

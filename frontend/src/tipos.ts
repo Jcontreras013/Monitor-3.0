@@ -296,3 +296,25 @@ export type HistoricoCalidad = {
   por_tecnico: { tecnico: string; total: number; aprobado: number; con_obs: number; rechazado: number; sin_gestion: number }[]
   resumen: ({ nombre: string; cantidad: number } | { titulo: string; columna: string; filas: Conteo[] })[]
 }
+
+export type CierreDiario = {
+  fecha: string
+  total_cerradas: number
+  avance: Consolidado[]
+  produccion: { sop: Conteo[]; instalaciones: Conteo[]; plex: Conteo[]; otros: Conteo[] }
+  eficiencia: { tecnico: string; ins: number; sop: number; otr: number; puntos_base: number; bono_mixto: number; logro_final: number }[]
+  primera_orden: { tecnico: string; hora_ini: string; colonia: string | null; num: string; actividad: string }[]
+  cerradas: Orden[]
+}
+
+export type Arranque = { desde: string; hasta: string; filas: { tecnico: string; dias: number; hora_promedio: string }[] }
+
+export type PendientesDispatch = {
+  resumen: { categoria: string; asignadas: number; sin_asignar: number; total: number }[]
+  totales: { asignadas: number; sin_asignar: number; total: number }
+  cubetas: Conteo[]
+  instalaciones: Conteo[]
+  soporte: Conteo[]
+  resto: Conteo[]
+  sin_asignar: Orden[]
+}

@@ -183,7 +183,7 @@ def _conteo(valores: Iterable[str]) -> list[dict]:
     return [{"nombre": k, "cantidad": v} for k, v in Counter(valores).most_common()]
 
 
-def _consolidado(segmento: str, pend: list[OrdenLike], cerr: list[OrdenLike], hoy: date) -> dict:
+def consolidado(segmento: str, pend: list[OrdenLike], cerr: list[OrdenLike], hoy: date) -> dict:
     if segmento != "GLOBAL":
         pend = [o for o in pend if o.segmento == segmento]
         cerr = [o for o in cerr if o.segmento == segmento]
@@ -267,7 +267,7 @@ def calcular_resumen(ordenes: Iterable[OrdenLike], filtros: Filtros, ahora: date
             "plex": {"subtipos": _conteo(o.actividad for o in plex), "total": len(plex)},
         },
         "consolidado": [
-            _consolidado(seg, foco, cerr, hoy)
+            consolidado(seg, foco, cerr, hoy)
             for seg in (c.SEGMENTO_RESIDENCIAL, c.SEGMENTO_PLEX, "GLOBAL")
         ],
         "estados_no_reconocidos": [
