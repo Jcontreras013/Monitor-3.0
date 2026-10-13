@@ -11,6 +11,7 @@ import uuid
 from datetime import date, datetime
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     Date,
     DateTime,
@@ -323,3 +324,14 @@ class EstadoAlerta(Base):
     resultado: Mapped[str] = mapped_column(String(30), default="")
     detalle: Mapped[str] = mapped_column(Text, default="")
     actualizado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EstadoBot(Base):
+    """Último update de Telegram ya atendido, para no reprocesar mensajes si el bot se reinicia."""
+
+    __tablename__ = "estado_bots"
+
+    nombre: Mapped[str] = mapped_column(String(40), primary_key=True)
+    offset: Mapped[int] = mapped_column(BigInteger)
+    actualizado_en: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(),
+                                                     onupdate=func.now())

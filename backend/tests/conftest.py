@@ -19,7 +19,8 @@ from app.config import get_settings, url_asyncpg
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 TABLAS = ("ordenes", "usuarios", "estado_robot", "dispositivos_fttx", "personal", "expedientes", "archivos",
-          "calidad_gestiones", "auditorias_campo", "clientes_vip", "alertas_enviadas", "estado_alertas")
+          "calidad_gestiones", "auditorias_campo", "clientes_vip", "alertas_enviadas", "estado_alertas",
+          "estado_bots")
 
 
 @pytest.fixture(scope="session")

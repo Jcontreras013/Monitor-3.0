@@ -45,5 +45,21 @@ services:
       api:
         condition: service_started
 
+  # Bot de Telegram de faltas (TELEGRAM_TOKEN y TELEGRAM_CHAT_ID en backend/.env).
+  # Se activa con: docker compose --profile telegram up
+  telegram:
+    build: .
+    command: ["python", "-m", "worker.telegram"]
+    profiles: ["telegram"]
+    restart: unless-stopped
+    env_file:
+      - path: backend/.env
+        required: false
+    environment:
+      DATABASE_URL: postgresql://monitor:monitor@db:5432/monitor
+    depends_on:
+      api:
+        condition: service_started
+
 volumes:
   datos_pg:

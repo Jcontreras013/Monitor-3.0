@@ -56,7 +56,7 @@ Reescritura de [monitor-operativo](https://github.com/Jcontreras013/monitor-oper
 | 2 | Login, roles, Monitor en vivo (filtros rápidos con conteo, KPIs, pestañas de pendientes / cerradas / carga / avance, detalle de orden y CSV) | ✅ |
 | 3 | Expedientes (faltas, análisis, resumen del mes, repositorio, PDF y formulario oficial en Word) y Control de Calidad (llamadas, cierres INSFIBRA, auditorías de campo, histórico con CSAT y PDF; las auditorías de fibra deficientes pasan a Expedientes) | ✅ |
 | 4 | Reprogramadas / No instalados ✅ · Centro de Reportes: cierre diario, pendientes para Dispatch y arranque de jornada (PDF/Excel) ✅ · análisis de red OLT/PON, diagnóstico offline, análisis cruzado, Gantt | En curso |
-| 5 | Configuración (clientes VIP, correo de alertas), panel VIP en el Monitor y alertas del robot por correo (VIP nuevas, molex en cierres) ✅ · Bot de Telegram | En curso |
+| 5 | Configuración (clientes VIP, correo de alertas), panel VIP en el Monitor, alertas del robot por correo (VIP nuevas, molex en cierres) y bot de Telegram de faltas | ✅ |
 | 6 | Auditoría de vehículos, tiempos de técnicos, materiales, IA (`ia.py`) | Pendiente |
 
 Del Monitor anterior todavía faltan: el Gantt, las órdenes manuales, el filtro de técnicos contra el catálogo de técnicos principales y el PDF de órdenes totales (por ahora hay exportación a CSV).
@@ -141,6 +141,18 @@ Para traer historial más viejo una sola vez: `uv run python -m worker.sync --ba
 
 Después de cada ciclo exitoso el robot manda las **alertas por correo** con las variables `CORREO_*` de su `.env`: órdenes nuevas de clientes VIP (abiertas en las últimas 24 h, a `CORREO_DESTINATARIOS_VIP`) y cierres de soporte cuyo comentario dice que se puso una molex nueva en medio del tramo (a `CORREO_DESTINATARIOS`). Cada orden se avisa una sola vez (tabla `alertas_enviadas`, antes los `.json` de la PC) y el resultado se ve en **Configuración → Correo de alertas**.
 
+### Bot de Telegram (faltas desde el grupo de jefes)
+
+Es otro proceso, igual que el robot, y puede correr en la misma PC (o en cualquier lugar con internet y acceso a la base): `TELEGRAM_TOKEN` (de @BotFather) y `TELEGRAM_CHAT_ID` (el id del grupo) en `backend/.env`, y
+
+```powershell
+uv run python -m worker.telegram
+nssm install MonitorTelegram C:\Maxcom\Monitor-3.0\backend\.venv\Scripts\python.exe -m worker.telegram
+nssm set MonitorTelegram AppDirectory C:\Maxcom\Monitor-3.0\backend
+```
+
+En el grupo: `/falta` abre el formulario guiado con botones (las mismas opciones que Expedientes) y también se puede mandar un mensaje que empiece con `FALTA` y líneas `Colaborador:`, `Área:`, `Motivo:`, `Fecha:`, `Descripción:` (con foto opcional). El nombre se busca en el catálogo de personal tolerando errores de dedo; la falta queda en Expedientes con origen "telegram" y la foto como evidencia. `/ayuda` explica el formato. Apaga `telegram_bot.py` antes de arrancar este: Telegram solo entrega cada mensaje a uno de los dos.
+
 ## Diferencias con el sistema anterior (a propósito)
 
 - **Listas unificadas**: se usa la versión completa de los estados vivos (14) y de las actividades basura (7). Antes, una orden `ABIERTA` contaba como pendiente en el Monitor pero el robot la trataba como terminada.
@@ -153,6 +165,7 @@ Después de cada ciclo exitoso el robot manda las **alertas por correo** con las
 - **Archivos**: las evidencias de Expedientes y las fotos de auditorías se guardan en Postgres (se valida que sean imagen o PDF de verdad) en lugar de Catbox/Drive, que eran públicos.
 - **Permisos por módulo** en un solo lugar (`app/permisos.py`). El rol `llamados` solo ve Expedientes; las vistas de Calidad para `sac` y `miguel` se mantienen como antes.
 - **Cierre diario**: el día de un cierre es siempre el día operativo (HORA_LIQ − 6 h), igual que "Cerradas hoy" del Monitor; antes el PDF no restaba las 6 h y la pantalla sí, así que no siempre coincidían. La antigüedad de una orden liquidada son los días entre apertura y cierre (antes, los días de retraso de la última vez que el robot la vio).
+- **Bot de Telegram**: las faltas se guardan en Postgres (antes la pestaña Expedientes + GCS) y las fotos como evidencia privada (antes Catbox). El colaborador administrativo se guarda con su departamento como área (antes "NOMBRE (DEPARTAMENTO)"). El último mensaje atendido se guarda en la base (antes `telegram_offset.txt`).
 - **Correo**: se configura con variables de entorno `CORREO_*` en lugar de la sección `[correo]` de `secrets.toml`. La lista VIP vive en Postgres (antes la hoja `VIP`).
 - **Preferencias de interfaz y manual**: las casillas para ocultar secciones del Monitor ya no hacen falta (el Monitor nuevo va por pestañas) y el manual del sistema anterior describe pantallas que cambiaron; queda pendiente escribir uno nuevo.
 - **Envío de encuestas por WhatsApp (WATI)**: no se migró. Los envíos viejos se importan como gestiones "Sin Gestión".
@@ -174,6 +187,7 @@ backend/
       vip.py            lectura del Excel/CSV de clientes VIP
       materiales.py     qué dice el comentario de cierre sobre las cajas molex
       reportes.py       cierre diario, eficiencia, primera orden, arranque, pendientes para Dispatch
+      telegram.py       conversación del bot de faltas (/falta y mensaje FALTA)
     alertas.py        alertas por correo del robot (VIP nuevas, molex en cierres)
     correo.py         envío SMTP (587/465)
     api/              rutas: auth, monitor, reportes, reprogramadas, robot, eventos (SSE), archivos, expedientes, calidad, configuracion
@@ -181,7 +195,7 @@ backend/
     models.py         tablas
     repositorio.py    upsert de órdenes, estado del robot
     main.py           app FastAPI (+ sirve el frontend)
-  worker/             robot: cliente de Cepheus y ciclo de sincronización
+  worker/             robot (Cepheus -> Postgres) y bot de Telegram
   scripts/            usuarios, importación del historial, datos de demostración
   alembic/            migraciones
   tests/

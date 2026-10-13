@@ -64,6 +64,10 @@ class Settings(BaseSettings):
     correo_destinatarios: Annotated[list[str], NoDecode] = Field(default_factory=list)
     correo_destinatarios_vip: Annotated[list[str], NoDecode] = Field(default_factory=list)
 
+    # Bot de Telegram para registrar faltas desde el grupo de jefes.
+    telegram_token: str = ""
+    telegram_chat_id: str = ""
+
     @field_validator("database_url")
     @classmethod
     def _normalizar_url(cls, v: str) -> str:
