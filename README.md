@@ -55,7 +55,7 @@ Reescritura de [monitor-operativo](https://github.com/Jcontreras013/monitor-oper
 | 1 | Robot Cepheus → Postgres e importación del historial de Sheets | ✅ |
 | 2 | Login, roles, Monitor en vivo (filtros rápidos con conteo, KPIs, pestañas de pendientes / cerradas / carga / avance, detalle de orden y CSV) | ✅ |
 | 3 | Expedientes (faltas, análisis, resumen del mes, repositorio, PDF y formulario oficial en Word) y Control de Calidad (llamadas, cierres INSFIBRA, auditorías de campo, histórico con CSAT y PDF; las auditorías de fibra deficientes pasan a Expedientes) | ✅ |
-| 4 | Centro de Reportes (PDF/Excel), Reprogramadas / No instalados, Gantt | Pendiente |
+| 4 | Reprogramadas / No instalados ✅ · Centro de Reportes (PDF/Excel), Gantt | En curso |
 | 5 | Bot de Telegram y alertas por correo (VIP, molex) | Pendiente |
 | 6 | Auditoría de vehículos, tiempos de técnicos, materiales, IA (`ia.py`), configuración | Pendiente |
 
@@ -164,7 +164,7 @@ backend/
       nombres.py        cruce difuso de nombres (para Expedientes y Telegram)
       expedientes.py    gravedad, reincidencias, resumen del mes
       calidad.py        encuesta, CSAT, resultado de la gestión, diagnóstico
-    api/              rutas: auth, monitor, robot, eventos (SSE), archivos, expedientes, calidad
+    api/              rutas: auth, monitor, reprogramadas, robot, eventos (SSE), archivos, expedientes, calidad
     reportes/         PDF (HTML + WeasyPrint) y formulario oficial en Word
     models.py         tablas
     repositorio.py    upsert de órdenes, estado del robot
@@ -175,7 +175,7 @@ backend/
   tests/
 frontend/src/
   modulos.tsx         menú: qué módulos ve cada usuario (lo decide la API)
-  pantallas/          Monitor, Calidad, Expedientes
+  pantallas/          Monitor, Reprogramadas, Calidad, Expedientes
   componentes/        login, encabezado, filtros, indicadores, tabla de órdenes, calidad/, expedientes/
 Dockerfile            imagen única (API + frontend; el robot usa la misma)
 docker-compose.yml    Postgres + API (+ robot con --profile robot)

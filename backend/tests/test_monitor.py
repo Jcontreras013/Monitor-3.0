@@ -137,3 +137,29 @@ def test_de_punta_a_punta_con_ordenes_normalizadas():
     assert r["kpis"]["offline"] == 1
     assert r["kpis"]["cerradas_hoy"] == 1
     assert r["retraso"][0] == {"cubeta": ">= 7 Dia", "cantidad": 1, "porcentaje": 100.0}
+
+
+def test_reprogramadas_solo_vivas_agendadas_despues_de_hoy():
+    ordenes = [
+        Ord("hoy", fecha_ape=AHORA + timedelta(hours=5)),            # más tarde hoy: no es reprogramada
+        Ord("lejos", fecha_ape=AHORA + timedelta(days=5)),
+        Ord("manana", fecha_ape=AHORA + timedelta(days=1)),
+        Ord("cerrada", es_viva=False, fecha_ape=AHORA + timedelta(days=2)),
+        Ord("ajena", actividad="NOINSTALADO", fecha_ape=AHORA + timedelta(days=2)),
+        Ord("sin_fecha", fecha_ape=None),
+    ]
+    lista = m.reprogramadas(ordenes, HOY)
+    assert [o.num for o in lista] == ["manana", "lejos"]
+    assert [m.dias_para_cita(o, HOY) for o in lista] == [1, 5]
+
+
+def test_no_instalados_de_hoy_con_dia_operativo():
+    hoy_6am = datetime.combine(HOY, datetime.min.time()) + timedelta(hours=6)
+    ordenes = [
+        cerrada("1", actividad="NOINSTALADO", hora_liq=hoy_6am + timedelta(hours=3)),
+        cerrada("2", actividad="NOINSTALADO", hora_liq=hoy_6am - timedelta(minutes=1)),  # día operativo anterior
+        cerrada("3", actividad="NOINSTALADO", tecnico="", hora_liq=hoy_6am + timedelta(hours=1)),
+        cerrada("4", actividad="INSFIBRA", hora_liq=hoy_6am + timedelta(hours=1)),
+        cerrada("5", actividad="NOINSTALADO", hora_liq=hoy_6am + timedelta(hours=1)),
+    ]
+    assert [o.num for o in m.no_instalados_hoy(ordenes, HOY)] == ["5", "1"]

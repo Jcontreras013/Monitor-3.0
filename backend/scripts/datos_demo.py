@@ -90,6 +90,27 @@ def generar(n: int = 400) -> list[dict]:
             orden["HORACIERREORDEN"] = cierre.strftime("%d/%m/%Y %H:%M")
             orden["RAZON CIERRE"] = random.choice(["Solucionado", "Cambio de conector", "Instalado"])
         crudas.append(orden)
+    # Reprogramadas: vivas con la cita en los próximos días.
+    for i in range(6):
+        crudas.append({
+            "IDORDEN": str(95_800_000 + i), "NOMACTIVIDAD": random.choice(["INSFIBRA", "SOPFIBRA", "TRASLADOEXTFIBRA"]),
+            "ESTADO": "Asignada", "TECNICO": random.choice(TECNICOS), "CLIENTE": str(300_000 + i),
+            "NOMBRECLIENTE": f"Cliente reprogramado {i}", "COLONIA": random.choice(COLONIAS),
+            "COMENTARIO": "Cliente pidió cambiar la cita",
+            "FECHAAPERTURA": (ahora + timedelta(days=random.randint(1, 6))).strftime("%d/%m/%Y %H:%M"),
+        })
+    # No instalados de hoy (HORA_LIQ de Cepheus viene 6 h adelantada).
+    for i in range(3):
+        cierre = ahora + timedelta(hours=6) - timedelta(minutes=random.randint(20, 300))
+        crudas.append({
+            "IDORDEN": str(95_900_000 + i), "NOMACTIVIDAD": "NOINSTALADO", "ESTADO": "Cerrada",
+            "TECNICO": random.choice(TECNICOS), "CLIENTE": str(400_000 + i),
+            "NOMBRECLIENTE": f"Cliente sin instalar {i}",
+            "COLONIA": random.choice(COLONIAS), "FECHAAPERTURA": (ahora - timedelta(days=1)).strftime("%d/%m/%Y %H:%M"),
+            "HORAINICIOORDEN": (cierre - timedelta(minutes=40)).strftime("%d/%m/%Y %H:%M"),
+            "HORACIERREORDEN": cierre.strftime("%d/%m/%Y %H:%M"),
+            "RAZON CIERRE": random.choice(["Cliente no se encontraba", "Sin factibilidad", "Cliente canceló"]),
+        })
     return crudas
 
 

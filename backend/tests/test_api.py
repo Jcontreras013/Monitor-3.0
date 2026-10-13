@@ -126,3 +126,31 @@ async def test_estado_del_robot(cliente, crear_usuario, sesiones):
 
 async def test_salud(cliente):
     assert (await cliente.get("/api/salud")).json() == {"ok": True}
+
+
+async def test_reprogramadas_y_no_instalados(cliente, crear_usuario, sesiones):
+    ahora = ahora_hn()
+    fmt = "%Y-%m-%d %H:%M:%S"
+    crudas = [
+        {"NUM": "10", "ACTIVIDAD": "INSFIBRA", "ESTADO": "ASIGNADA", "TECNICO": "Ana",
+         "FECHA_APE": (ahora + timedelta(days=3)).strftime(fmt)},
+        {"NUM": "11", "ACTIVIDAD": "SOPFIBRA", "ESTADO": "ASIGNADA", "TECNICO": "Ana",
+         "FECHA_APE": (ahora - timedelta(days=1)).strftime(fmt)},
+        {"NUM": "12", "ACTIVIDAD": "NOINSTALADO", "ESTADO": "CERRADA", "TECNICO": "Beto",
+         "FECHA_APE": (ahora - timedelta(days=1)).strftime(fmt),
+         "HORA_LIQ": (ahora + timedelta(hours=6)).strftime(fmt)},  # HORA_LIQ viene 6 h adelantada
+    ]
+    async with sesiones() as s:
+        await repositorio.guardar_ordenes(s, [o for c in crudas if (o := normalizar_orden(c, ahora))])
+        await s.commit()
+
+    await crear_usuario(usuario="mon", rol="monitoreo")
+    await entrar(cliente, usuario="mon")
+    assert (await cliente.get("/api/reprogramadas")).status_code == 403
+
+    cliente.cookies.clear()
+    await crear_usuario(usuario="jefa", rol="jefe")
+    await entrar(cliente, usuario="jefa")
+    r = (await cliente.get("/api/reprogramadas")).json()
+    assert [(o["num"], o["dias_para_cita"]) for o in r["reprogramadas"]] == [("10", 3)]
+    assert [o["num"] for o in r["no_instalados"]] == ["12"]

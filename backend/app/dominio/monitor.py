@@ -135,6 +135,44 @@ def cerradas_hoy(filtradas: Iterable[OrdenLike], hoy: date) -> list[OrdenLike]:
 
 
 # ------------------------------------------------------------------------------
+# Reprogramadas / No instalados
+# ------------------------------------------------------------------------------
+ACTIVIDAD_NO_INSTALADO = "NOINSTALADO"
+
+
+def reprogramadas(ordenes: Iterable[OrdenLike], hoy: date) -> list[OrdenLike]:
+    """
+    Órdenes vivas agendadas a futuro: Cepheus mueve la FECHA_APE de una orden
+    reprogramada a la fecha de la nueva cita. La más próxima primero.
+    """
+    return sorted(
+        (o for o in ordenes
+         if o.es_viva and o.fecha_ape is not None and o.fecha_ape.date() > hoy
+         and o.actividad in c.ACTIVIDADES_PERMITIDAS),
+        key=lambda o: (o.fecha_ape, o.num),
+    )
+
+
+def dias_para_cita(orden: OrdenLike, hoy: date) -> int:
+    return (orden.fecha_ape.date() - hoy).days if orden.fecha_ape else 0
+
+
+def no_instalados_hoy(ordenes: Iterable[OrdenLike], hoy: date) -> list[OrdenLike]:
+    """
+    Órdenes que un técnico cerró hoy como NOINSTALADO. Esa actividad no está en
+    la lista blanca, por eso no se filtra por ella; el día se calcula igual que
+    "cerradas hoy" (HORA_LIQ menos 6 h).
+    """
+    return sorted(
+        (o for o in ordenes
+         if ACTIVIDAD_NO_INSTALADO in (o.actividad or "").upper()
+         and o.hora_liq is not None and dia_operativo(o.hora_liq) == hoy
+         and tecnico_asignado(o.tecnico)),
+        key=lambda o: o.hora_liq,
+    )
+
+
+# ------------------------------------------------------------------------------
 # Resumen completo
 # ------------------------------------------------------------------------------
 def _pct(parte: int, total: int) -> float:

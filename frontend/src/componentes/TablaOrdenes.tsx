@@ -12,6 +12,8 @@ type Columna = {
   clase?: string
 }
 
+export type VistaTabla = 'pendientes' | 'cerradas_hoy' | 'reprogramadas' | 'no_instalados'
+
 const COLOR_DIAS = (d: number) =>
   d >= 7 ? 'bg-red-100 text-red-800' : d >= 4 ? 'bg-amber-100 text-amber-800' : d >= 1 ? 'bg-yellow-100 text-yellow-800' : 'bg-emerald-100 text-emerald-800'
 
@@ -80,6 +82,63 @@ const COLUMNAS_CERRADAS: Columna[] = [
   { clave: 'tiempo', titulo: 'Tiempo', valor: (o) => o.tiempo_real_min, celda: (o) => duracion(o.tiempo_real_min) },
   { clave: 'razon', titulo: 'Razón de cierre', valor: (o) => o.razon_cierre, clase: 'text-xs' },
 ]
+
+function EnDias({ dias }: { dias: number }) {
+  return (
+    <span className="rounded bg-blue-100 px-2 py-0.5 text-xs font-bold whitespace-nowrap text-blue-800">
+      {dias === 1 ? 'mañana' : `en ${dias} d`}
+    </span>
+  )
+}
+
+const COLUMNAS_REPROGRAMADAS: Columna[] = [
+  {
+    clave: 'cita',
+    titulo: 'Cita',
+    valor: (o) => o.fecha_ape,
+    celda: (o) => (
+      <span className="flex items-center gap-2 whitespace-nowrap">
+        <EnDias dias={o.dias_para_cita ?? 0} /> {horaLocal(o.fecha_ape)}
+      </span>
+    ),
+  },
+  { clave: 'num', titulo: 'Orden', valor: (o) => o.num, clase: 'font-mono' },
+  { clave: 'actividad', titulo: 'Actividad', valor: (o) => o.actividad },
+  {
+    clave: 'tecnico',
+    titulo: 'Técnico',
+    valor: (o) => o.tecnico ?? '',
+    celda: (o) => o.tecnico ?? <span className="text-xs font-semibold text-amber-700">SIN ASIGNAR</span>,
+  },
+  { clave: 'cliente', titulo: 'Cliente', valor: (o) => o.nombre, celda: (o) => <Cliente o={o} detalle={[o.cliente, o.colonia]} /> },
+  { clave: 'estado', titulo: 'Estado', valor: (o) => o.estado, clase: 'text-xs text-slate-500' },
+  { clave: 'comentario', titulo: 'Comentario', valor: (o) => o.comentario, celda: (o) => <span className="line-clamp-2 max-w-80 text-xs">{o.comentario}</span> },
+]
+
+const COLUMNAS_NO_INSTALADOS: Columna[] = [
+  { clave: 'cierre', titulo: 'Cierre', valor: (o) => o.hora_liq, celda: (o) => horaLocal(o.hora_liq), clase: 'whitespace-nowrap' },
+  { clave: 'num', titulo: 'Orden', valor: (o) => o.num, clase: 'font-mono' },
+  { clave: 'tecnico', titulo: 'Técnico', valor: (o) => o.tecnico },
+  { clave: 'cliente', titulo: 'Cliente', valor: (o) => o.nombre, celda: (o) => <Cliente o={o} detalle={[o.cliente, o.colonia]} /> },
+  {
+    clave: 'razon',
+    titulo: 'Razón / comentario de cierre',
+    valor: (o) => o.razon_cierre,
+    celda: (o) => (
+      <span className="block max-w-96 text-xs">
+        {o.razon_cierre && <strong className="block">{o.razon_cierre}</strong>}
+        <span className="line-clamp-2">{o.comentario_cierre || o.comentario}</span>
+      </span>
+    ),
+  },
+]
+
+const COLUMNAS: Record<VistaTabla, Columna[]> = {
+  pendientes: COLUMNAS_PENDIENTES,
+  cerradas_hoy: COLUMNAS_CERRADAS,
+  reprogramadas: COLUMNAS_REPROGRAMADAS,
+  no_instalados: COLUMNAS_NO_INSTALADOS,
+}
 
 // El CSV lleva todos los datos, aunque la tabla muestre menos columnas.
 const COLUMNAS_CSV: [string, (o: Orden) => string | number | null][] = [
@@ -158,12 +217,14 @@ export default function TablaOrdenes({
   ordenes,
   vista,
   cargando,
+  vacio = 'No hay órdenes con estos filtros.',
 }: {
   ordenes: Orden[]
-  vista: 'pendientes' | 'cerradas_hoy'
+  vista: VistaTabla
   cargando: boolean
+  vacio?: string
 }) {
-  const columnas = vista === 'pendientes' ? COLUMNAS_PENDIENTES : COLUMNAS_CERRADAS
+  const columnas = COLUMNAS[vista]
   const [busqueda, setBusqueda] = useState('')
   const [orden, setOrden] = useState<{ clave: string; asc: boolean } | null>(null)
   const [pagina, setPagina] = useState(0)
@@ -226,19 +287,23 @@ export default function TablaOrdenes({
                 {vista === 'pendientes' && (
                   <span className={`rounded px-2 py-0.5 text-xs font-bold ${COLOR_DIAS(o.dias_retraso)}`}>{o.dias_retraso} d</span>
                 )}
+                {vista === 'reprogramadas' && <EnDias dias={o.dias_para_cita ?? 0} />}
                 <span className="font-mono font-semibold">{o.num}</span>
                 <span className="text-slate-500">{o.actividad}</span>
-                <span className="ml-auto text-xs text-slate-500">{vista === 'pendientes' ? o.estado : horaLocal(o.hora_liq)}</span>
+                <span className="ml-auto text-xs text-slate-500">
+                  {vista === 'pendientes' ? o.estado : horaLocal(vista === 'reprogramadas' ? o.fecha_ape : o.hora_liq)}
+                </span>
               </span>
               <span className="block text-slate-700">{o.tecnico ?? 'SIN ASIGNAR'}</span>
               <span className="flex flex-wrap items-center gap-1 text-xs text-slate-500">
-                {[o.nombre, o.colonia].filter(Boolean).join(' · ')} · {o.motivo} <Marcas o={o} />
+                {[o.nombre, o.colonia].filter(Boolean).join(' · ')}
+                {vista === 'no_instalados' ? o.razon_cierre && <> · {o.razon_cierre}</> : <> · {o.motivo} <Marcas o={o} /></>}
               </span>
             </button>
           </li>
         ))}
         {!visibles.length && (
-          <li className="px-3 py-8 text-center text-slate-400">{cargando ? 'Cargando…' : 'No hay órdenes con estos filtros.'}</li>
+          <li className="px-3 py-8 text-center text-slate-400">{cargando ? 'Cargando…' : vacio}</li>
         )}
       </ul>
       <div className="hidden overflow-x-auto sm:block">
@@ -268,7 +333,7 @@ export default function TablaOrdenes({
             {!visibles.length && (
               <tr>
                 <td colSpan={columnas.length} className="px-3 py-8 text-center text-slate-400">
-                  {cargando ? 'Cargando…' : 'No hay órdenes con estos filtros.'}
+                  {cargando ? 'Cargando…' : vacio}
                 </td>
               </tr>
             )}

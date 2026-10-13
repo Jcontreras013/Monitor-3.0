@@ -71,6 +71,13 @@ export type Orden = {
   segmento: string
   grupo_tablero: string
   subtipo_tablero: string
+  /** Solo en Reprogramadas: días que faltan para la cita. */
+  dias_para_cita?: number
+}
+
+export type Reprogramadas = {
+  reprogramadas: (Orden & { dias_para_cita: number })[]
+  no_instalados: Orden[]
 }
 
 export type OpcionesFiltro = {
